@@ -1,13 +1,9 @@
-<#
-.SYNOPSIS
-    OpenQode Input Bridge - Basic Computer Use
-.DESCRIPTION
-    Provides mouse, keyboard, and screen capabilities for the AI Agent.
-    Usage: input.ps1 <command> [args...]
-#>
 param(
-    [string]$Action,
-    [string[]]$Args
+    [Parameter(Position=0, Mandatory=$true)]
+    [string]$Command,
+
+    [Parameter(Position=1, ValueFromRemainingArguments=$true)]
+    [string[]]$Params
 )
 
 # Load required assemblies
@@ -35,11 +31,11 @@ public class Win32 {
 "@
 Add-Type -TypeDefinition $code -Language CSharp
 
-switch ($Action.ToLower()) {
+switch ($Command.ToLower()) {
     "mouse" {
-        if ($Args.Count -lt 2) { Write-Error "Usage: mouse x y"; exit 1 }
-        [System.Windows.Forms.Cursor]::Position = New-Object System.Drawing.Point([int]$Args[0], [int]$Args[1])
-        Write-Host "Moved mouse to $($Args[0]), $($Args[1])"
+        if ($Params.Count -lt 2) { Write-Error "Usage: mouse x y"; exit 1 }
+        [System.Windows.Forms.Cursor]::Position = New-Object System.Drawing.Point([int]$Params[0], [int]$Params[1])
+        Write-Host "Moved mouse to $($Params[0]), $($Params[1])"
     }
 
     "click" {
@@ -56,16 +52,16 @@ switch ($Action.ToLower()) {
     }
 
     "type" {
-        if ($Args.Count -lt 1) { Write-Error "Usage: type 'text'"; exit 1 }
-        $text = $Args -join " "
+        if ($Params.Count -lt 1) { Write-Error "Usage: type 'text'"; exit 1 }
+        $text = $Params -join " "
         [System.Windows.Forms.SendKeys]::SendWait($text)
         Write-Host "Typed: $text"
     }
 
     "key" {
         # Usage: key ENTER, key LWIN, key TAB
-        if ($Args.Count -lt 1) { Write-Error "Usage: key KEYNAME"; exit 1 }
-        $k = $Args[0].ToUpper()
+        if ($Params.Count -lt 1) { Write-Error "Usage: key KEYNAME"; exit 1 }
+        $k = $Params[0].ToUpper()
         
         # Handle Windows Key specifically (common request)
         if ($k -eq "LWIN" -or $k -eq "WIN") {
@@ -89,7 +85,7 @@ switch ($Action.ToLower()) {
     }
 
     "screenshot" {
-        if ($Args.Count -lt 1) { $file = "screenshot.png" } else { $file = $Args[0] }
+        if ($Params.Count -lt 1) { $file = "screenshot.png" } else { $file = $Params[0] }
         $fullPath = [System.IO.Path]::GetFullPath($file)
         
         $bmp = New-Object System.Drawing.Bitmap ([System.Windows.Forms.SystemInformation]::VirtualScreen.Width, [System.Windows.Forms.SystemInformation]::VirtualScreen.Height)
