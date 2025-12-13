@@ -19,7 +19,10 @@ $repoUrl = "https://github.com/roman-ryzenadvanced/OpenQode-Public-Alpha.git"
 $targetDir = "OpenQode"
 
 if (Test-Path $targetDir) {
-    Write-Host "Directory '$targetDir' already exists. Entering directory..." -ForegroundColor Yellow
+    Write-Host "Directory '$targetDir' already exists. Updating..." -ForegroundColor Yellow
+    Push-Location $targetDir
+    git pull
+    Pop-Location
 } else {
     Write-Host "Cloning repository..." -ForegroundColor Yellow
     git clone $repoUrl $targetDir

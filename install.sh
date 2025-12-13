@@ -22,7 +22,14 @@ TARGET_DIR="OpenQode"
 REPO_URL="https://github.com/roman-ryzenadvanced/OpenQode-Public-Alpha.git"
 
 if [ -d "$TARGET_DIR" ]; then
-    echo -e "\033[1;33mDirectory '$TARGET_DIR' already exists. Entering...\033[0m"
+    echo -e "\033[1;33mDirectory '$TARGET_DIR' already exists. Updating...\033[0m"
+    cd "$TARGET_DIR"
+    git pull
+    if [ $? -ne 0 ]; then
+        echo -e "\033[0;31mUpdate failed. Please delete the directory and try again.\033[0m"
+        exit 1
+    fi
+    cd ..
 else
     echo -e "\033[1;33mCloning repository...\033[0m"
     git clone "$REPO_URL" "$TARGET_DIR"
