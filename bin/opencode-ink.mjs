@@ -12,7 +12,7 @@ import Spinner from 'ink-spinner';
 import SelectInput from 'ink-select-input';
 import fs from 'fs';
 import path from 'path';
-import { exec } from 'child_process';
+import { exec, spawn } from 'child_process';
 import { fileURLToPath } from 'url';
 import clipboard from 'clipboardy';
 // ESM-native Markdown component (replaces CommonJS ink-markdown)
@@ -240,6 +240,43 @@ const getModelsByGroup = () => {
         groups[group].push({ id, ...model });
     }
     return groups;
+};
+
+// ═══════════════════════════════════════════════════════════════
+// AGENTIC COMMAND EXECUTION
+// ═══════════════════════════════════════════════════════════════
+
+const extractCommands = (text) => {
+    const commands = [];
+    const regex = /```(?:bash|shell|cmd|sh|powershell|ps1)(?::run)?[\s\n]+([\s\S]*?)```/gi;
+    let match;
+    while ((match = regex.exec(text)) !== null) {
+        const content = match[1].trim();
+        if (content) {
+            content.split('\n').forEach(line => {
+                const cmd = line.trim();
+                if (cmd && !cmd.startsWith('#')) commands.push(cmd);
+            });
+        }
+    }
+    return commands;
+};
+
+const runShellCommand = (cmd, cwd = process.cwd()) => {
+    return new Promise((resolve) => {
+        // Use exec which handles shell command strings (quotes, spaces) correctly
+        exec(cmd, {
+            cwd,
+            env: { ...process.env, FORCE_COLOR: '1' },
+            maxBuffer: 1024 * 1024 * 5 // 5MB buffer for larger outputs
+        }, (error, stdout, stderr) => {
+            resolve({
+                success: !error,
+                output: stdout + (stderr ? '\n' + stderr : ''),
+                code: error ? (error.code || 1) : 0
+            });
+        });
+    });
 };
 
 // Current free model state (default to grok-code-fast-1)
@@ -514,18 +551,7 @@ const writeFile = (projectPath, filename, content) => {
     }
 };
 
-// Run shell command
-const runShellCommand = (cmd, cwd) => {
-    return new Promise((resolve) => {
-        exec(cmd, { cwd }, (error, stdout, stderr) => {
-            resolve({
-                success: !error,
-                output: stdout + (stderr ? '\n' + stderr : ''),
-                error: error ? error.message : null
-            });
-        });
-    });
-};
+
 
 // ═══════════════════════════════════════════════════════════════
 // RECENT PROJECTS
@@ -1970,6 +1996,11 @@ const App = () => {
     // NEW: Project Creation State
     const [newProjectName, setNewProjectName] = useState('');
 
+    // NEW: Command Execution State
+    const [detectedCommands, setDetectedCommands] = useState([]);
+    const [isExecutingCommands, setIsExecutingCommands] = useState(false);
+    const [commandResults, setCommandResults] = useState([]);
+
     // NEW: Multi-line buffer
     const [inputBuffer, setInputBuffer] = useState('');
 
@@ -3022,6 +3053,14 @@ This gives the user a chance to refine requirements before implementation.
 
                 // Extract files for AUTO-WRITE (Magic File Writer)
                 const files = extractCodeBlocks(responseText);
+
+                // NEW: Extract & Detect Commands
+                const cmds = extractCommands(responseText);
+                if (cmds.length > 0) {
+                    setDetectedCommands(cmds);
+                }
+
+                // Extract files logic continues...
                 if (files.length > 0) {
                     // AUTO-WRITE: Actually create the files!
                     const results = [];
@@ -3147,22 +3186,60 @@ This gives the user a chance to refine requirements before implementation.
 
     const handleCreateProject = () => {
         if (!newProjectName.trim()) return;
-        const safeName = newProjectName.trim().replace(/[^a-zA-Z0-9-_\s]/g, '_'); // Sanitize
-        const newPath = path.join(process.cwd(), safeName);
+
+        // Support Absolute Paths (e.g., E:\Test\Project or /home/user/project)
+        const isAbsolute = path.isAbsolute(newProjectName.trim());
+        let newPath;
+        let safeName;
+
+        if (isAbsolute) {
+            newPath = newProjectName.trim();
+            safeName = path.basename(newPath); // Use the last folder name as the project name
+        } else {
+            safeName = newProjectName.trim().replace(/[^a-zA-Z0-9-_\s]/g, '_'); // Sanitize relative names
+            newPath = path.join(process.cwd(), safeName);
+        }
 
         try {
             if (fs.existsSync(newPath)) {
-                setMessages(prev => [...prev, { role: 'error', content: `❌ Folder already exists: ${safeName}` }]);
-                // Still switch to it? Maybe user wants that.
+                // If it exists, just switch to it (user might want to open existing folder)
+                setMessages(prev => [...prev, { role: 'system', content: `✨ Opening existing folder: ${newPath}` }]);
             } else {
                 fs.mkdirSync(newPath, { recursive: true });
-                setMessages(prev => [...prev, { role: 'system', content: `✨ Created project folder: ${safeName}` }]);
+                setMessages(prev => [...prev, { role: 'system', content: `✨ Created project folder: ${newPath}` }]);
             }
             // Proceed to select it
             handleProjectSelect({ value: newPath });
         } catch (e) {
-            setMessages(prev => [...prev, { role: 'error', content: `❌ Failed to create folder: ${e.message}` }]);
+            setMessages(prev => [...prev, { role: 'error', content: `❌ Failed to create/open folder: ${e.message}` }]);
         }
+    };
+
+    const handleExecuteCommands = async (confirmed) => {
+        if (!confirmed) {
+            setDetectedCommands([]);
+            return;
+        }
+
+        setIsExecutingCommands(true);
+        // setAppState('executing'); 
+
+        const results = [];
+        for (const cmd of detectedCommands) {
+            setMessages(prev => [...prev, { role: 'system', content: `▶ Running: ${cmd}` }]);
+
+            const res = await runShellCommand(cmd, project || process.cwd());
+            results.push({ cmd, ...res });
+
+            if (res.success) {
+                setMessages(prev => [...prev, { role: 'system', content: `✅ Output:\n${res.output}` }]);
+            } else {
+                setMessages(prev => [...prev, { role: 'error', content: `❌ Failed (Exit ${res.code}):\n${res.output}` }]);
+            }
+        }
+
+        setDetectedCommands([]);
+        setIsExecutingCommands(false);
     };
 
     // Handle project selection
@@ -3216,11 +3293,15 @@ This gives the user a chance to refine requirements before implementation.
 
     // Project Creation Screen
     if (appState === 'create_project') {
+        const resolvedPath = path.isAbsolute(newProjectName.trim())
+            ? newProjectName.trim()
+            : path.join(process.cwd(), newProjectName.trim() || '<name>');
+
         return h(Box, { flexDirection: 'column', padding: 1 },
             h(Box, { borderStyle: 'round', borderColor: 'green', paddingX: 1, marginBottom: 1 },
                 h(Text, { bold: true, color: 'green' }, '🆕 Create New Project')
             ),
-            h(Text, { color: 'cyan', marginBottom: 1 }, 'Project Name (folder will be created in current dir):'),
+            h(Text, { color: 'cyan', marginBottom: 1 }, 'Enter Project Name OR Full Path (e.g., E:\\Test\\NewApp):'),
             h(Box, { borderStyle: 'single', borderColor: 'gray', paddingX: 1 },
                 h(TextInput, {
                     value: newProjectName,
@@ -3230,10 +3311,10 @@ This gives the user a chance to refine requirements before implementation.
                 })
             ),
             h(Box, { marginTop: 1, gap: 2 },
-                h(Text, { color: 'green' }, 'Press Enter to create'),
+                h(Text, { color: 'green' }, 'Press Enter to create/open'),
                 h(Text, { dimColor: true }, '| Esc to cancel (Ctrl+C to exit)')
             ),
-            h(Text, { color: 'gray', marginTop: 1 }, `Location: ${process.cwd()}\\<name>`)
+            h(Text, { color: 'gray', marginTop: 1 }, `Target: ${resolvedPath}`)
         );
     }
 
@@ -3561,6 +3642,7 @@ This gives the user a chance to refine requirements before implementation.
             alignItems: 'center',
             justifyContent: 'center'
         },
+            // ... (ModelSelector implementation) ...
             h(ModelSelector, {
                 isOpen: true,
                 currentModel: provider === 'opencode-free' ? freeModel : 'qwen-coder-plus',
@@ -3587,6 +3669,48 @@ This gives the user a chance to refine requirements before implementation.
                 },
                 onClose: () => setShowModelSelector(false)
             })
+        );
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // CONDITIONAL RENDER: Command Execution Overlay
+    // ═══════════════════════════════════════════════════════════════
+    if (detectedCommands.length > 0) {
+        return h(Box, {
+            flexDirection: 'column',
+            width: columns,
+            height: rows,
+            alignItems: 'center',
+            justifyContent: 'center',
+            borderStyle: 'double',
+            borderColor: 'magenta'
+        },
+            h(Box, { flexDirection: 'column', padding: 2, borderStyle: 'single', borderColor: 'magenta', minWidth: 50 },
+                h(Text, { bold: true, color: 'magenta', marginBottom: 1 }, '🖥️  COMMANDS DETECTED'),
+                h(Text, { color: 'white', marginBottom: 1 }, 'The AI suggested the following commands. Execute them?'),
+                h(Box, { flexDirection: 'column', marginBottom: 2, paddingLeft: 2 },
+                    detectedCommands.map((cmd, i) =>
+                        h(Text, { key: i, color: 'cyan' }, `${i + 1}. ${cmd}`)
+                    )
+                ),
+                isExecutingCommands
+                    ? h(Text, { color: 'yellow' }, '⏳ Executing...')
+                    : h(Box, { flexDirection: 'column', gap: 1 },
+                        h(Text, { color: 'green', bold: true }, '[Y] Yes (Run All)'),
+                        h(Text, { color: 'red', bold: true }, '[N] No (Skip)'),
+                    ),
+
+                // Hidden Input for Y/N handling
+                !isExecutingCommands && h(TextInput, {
+                    value: '',
+                    onChange: (val) => {
+                        const v = val.toLowerCase();
+                        if (v === 'y') handleExecuteCommands(true);
+                        if (v === 'n') handleExecuteCommands(false);
+                    },
+                    onSubmit: () => { }
+                })
+            )
         );
     }
 

@@ -7,7 +7,8 @@
  */
 
 import crypto from 'crypto';
-import fs from 'fs/promises';
+import fs from 'fs';
+import { readFile, writeFile, unlink } from 'fs/promises';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { createRequire } from 'module';
@@ -82,7 +83,7 @@ class QwenOAuth {
     /** Load stored tokens */
     async loadTokens() {
         try {
-            const data = await fs.readFile(TOKEN_FILE, 'utf8');
+            const data = await readFile(TOKEN_FILE, 'utf8');
             this.tokens = JSON.parse(data);
             return this.tokens;
         } catch (error) {
@@ -98,7 +99,7 @@ class QwenOAuth {
         if (tokens.expires_in && !tokens.expiry_date) {
             tokens.expiry_date = Date.now() + (tokens.expires_in * 1000);
         }
-        await fs.writeFile(TOKEN_FILE, JSON.stringify(tokens, null, 2));
+        await writeFile(TOKEN_FILE, JSON.stringify(tokens, null, 2));
     }
 
     /** Clear tokens */
@@ -107,7 +108,7 @@ class QwenOAuth {
         this.deviceCodeData = null;
         this.codeVerifier = null;
         try {
-            await fs.unlink(TOKEN_FILE);
+            await unlink(TOKEN_FILE);
         } catch (error) { }
     }
 
@@ -362,7 +363,13 @@ IMPORTANT RULES:
 
         // Prepend system context ONLY for build/create commands (detected by keywords)
         let finalMessage = message;
-        if (message.includes('CREATE:') || message.includes('ROLE:') || message.includes('Generate all necessary files')) {
+        const lowerMsg = message.toLowerCase();
+        if (message.includes('CREATE:') ||
+            message.includes('ROLE:') ||
+            message.includes('Generate all necessary files') ||
+            lowerMsg.includes('open ') ||
+            lowerMsg.includes('run ') ||
+            lowerMsg.includes('computer use')) {
             finalMessage = systemContext + message;
         }
 
@@ -370,17 +377,31 @@ IMPORTANT RULES:
             try {
                 console.log('Sending message via qwen CLI:', finalMessage.substring(0, 50) + '...');
 
-                // For long messages, write to temp file to avoid ENAMETOOLONG error
-                const tempFile = path.join(os.tmpdir(), `qwen-prompt-${Date.now()}.txt`);
-                fsSync.writeFileSync(tempFile, finalMessage, 'utf8');
-
                 // Run in current project directory to allow context access
                 const neutralCwd = process.cwd();
 
-                // Use spawn with stdin for long messages
-                const child = spawn('qwen', ['-p', `@${tempFile}`], {
+                // WINDOWS FIX: Execute JS directly to avoid cmd.exe argument splitting limits/bugs
+                // We derived this path from `where qwen` -> qwen.cmd -> cli.js location
+                const isWin = process.platform === 'win32';
+                let command = 'qwen';
+                let args = ['-p', finalMessage];
+
+                if (isWin) {
+                    const appData = process.env.APPDATA || '';
+                    const cliPath = path.join(appData, 'npm', 'node_modules', '@qwen-code', 'qwen-code', 'cli.js');
+                    if (fs.existsSync(cliPath)) {
+                        command = 'node';
+                        args = [cliPath, '-p', finalMessage];
+                    } else {
+                        // Fallback if standard path fails (though known to exist on this machine)
+                        command = 'qwen.cmd';
+                    }
+                }
+
+                // Use spawn with shell: false (REQUIRED for clean argument passing)
+                const child = spawn(command, args, {
                     cwd: neutralCwd,
-                    shell: true,
+                    shell: false,
                     env: {
                         ...process.env,
                         FORCE_COLOR: '0'
@@ -404,9 +425,6 @@ IMPORTANT RULES:
                 });
 
                 child.on('close', (code) => {
-                    // Clean up temp file
-                    try { fsSync.unlinkSync(tempFile); } catch (e) { }
-
                     // Clean up ANSI codes
                     const cleanResponse = stdout.replace(/[\u001b\u009b][[\]()#;?]*(?:[0-9]{1,4}(?:;[0-9]{0,4})*)?[0-9A-ORZcf-nqry=><]/g, '').trim();
 
@@ -428,7 +446,6 @@ IMPORTANT RULES:
                 });
 
                 child.on('error', (error) => {
-                    try { fsSync.unlinkSync(tempFile); } catch (e) { }
                     console.error('Qwen CLI spawn error:', error.message);
                     resolve({
                         success: false,
@@ -440,7 +457,6 @@ IMPORTANT RULES:
                 // Timeout after 120 seconds for long prompts
                 setTimeout(() => {
                     child.kill('SIGTERM');
-                    try { fsSync.unlinkSync(tempFile); } catch (e) { }
                     resolve({
                         success: false,
                         error: 'Request timed out (120s)',
