@@ -487,18 +487,25 @@ Now, respond ONLY as TERMINUS. Never break character.
 
 # COMPUTER USE & INPUT CONTROL
 You have access to a "Hands" script: \`bin/input.ps1\`.
-Use it to control the mouse and keyboard when requested.
+Use it to control the mouse, keyboard, and "see" the system.
 
-## Usage:
-- \`powershell bin/input.ps1 mouse <x> <y>\` (Move mouse)
-- \`powershell bin/input.ps1 click\` (Left click)
-- \`powershell bin/input.ps1 type "text"\` (Type test)
-- \`powershell bin/input.ps1 key <KEY>\` (Press key: LWIN, ENTER, TAB, etc)
-- \`powershell bin/input.ps1 screenshot <path.png>\` (Take screenshot)
+## 🛑 RULES FOR ACCURACY (CRITICAL):
+1. **CHECK RESOLUTION FIRST**: Before using ANY mouse coordinates, you MUST run:
+   \`powershell bin/input.ps1 screen\`
+   *Then calculate coordinates based on the output (e.g. 1920x1080).*
+2. **PREFER SHORTCUTS**: Shortcuts are 100% reliable. Mouse clicks are not.
+   - To open Start Menu: Use \`powershell bin/input.ps1 key LWIN\` (NEVER click).
+   - To switch apps: Use \`powershell bin/input.ps1 key ALB+TAB\`.
 
-## Example: "Open Start Menu"
+## Capabilities:
+- **Vision (Apps)**: \`powershell bin/input.ps1 apps\` (Lists all open windows)
+- **Vision (Screen)**: \`powershell bin/input.ps1 screenshot <path.png>\` (Captures screen)
+- **Mouse**: \`powershell bin/input.ps1 mouse <x> <y>\`, \`click\`, \`rightclick\`
+- **Keyboard**: \`powershell bin/input.ps1 type "text"\`, \`key <KEY>\`
+
+## Example: "What's on my screen?"
 \`\`\`powershell
-powershell bin/input.ps1 key LWIN
+powershell bin/input.ps1 apps
 \`\`\`
 `;
 
@@ -3242,13 +3249,19 @@ This gives the user a chance to refine requirements before implementation.
 
         const results = [];
         for (const cmd of detectedCommands) {
-            // FIX: Replace relative 'bin/input.ps1' with absolute path to allow running from any project folder
-            const inputScriptAbs = path.join(__dirname, 'input.ps1');
-            const safeInputmd = `"${inputScriptAbs}"`;
+            let finalCmd = cmd;
 
-            let finalCmd = cmd
-                .replace(/bin\/input\.ps1/g, safeInputmd)
-                .replace(/bin\\input\.ps1/g, safeInputmd);
+            // FIX: Robustly handle input.ps1 execution with spaces in path
+            if (cmd.includes('bin/input.ps1') || cmd.includes('bin\\input.ps1')) {
+                const inputScriptAbs = path.join(__dirname, 'input.ps1');
+                // Extract arguments (everything after input.ps1)
+                const parts = cmd.split(/input\.ps1/);
+                const args = parts[1] ? parts[1].trim() : '';
+
+                // Construct robust PowerShell command
+                // syntax: powershell -ExecutionPolicy Bypass -File "path with spaces" arg1 arg2
+                finalCmd = `powershell -NoProfile -ExecutionPolicy Bypass -File "${inputScriptAbs}" ${args}`;
+            }
 
             setMessages(prev => [...prev, { role: 'system', content: `▶ Running: ${finalCmd}` }]);
 

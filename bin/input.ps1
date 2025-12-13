@@ -96,8 +96,18 @@ switch ($Command.ToLower()) {
         $bmp.Dispose()
         Write-Host "Screenshot saved to $fullPath"
     }
+
+    "apps" {
+        # List all processes with a window title (visible apps)
+        $apps = Get-Process | Where-Object { $_.MainWindowTitle -ne "" } | Select-Object Id, MainWindowTitle
+        if ($apps) {
+            $apps | Format-Table -AutoSize | Out-String | Write-Host
+        } else {
+            Write-Host "No visible applications found."
+        }
+    }
     
     default {
-        Write-Host "Commands: mouse, click, rightclick, type, key, screen, screenshot"
+        Write-Host "Commands: mouse, click, rightclick, type, key, screen, screenshot, apps"
     }
 }
