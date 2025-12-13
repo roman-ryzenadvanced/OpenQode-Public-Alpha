@@ -29,12 +29,10 @@ try {
     // Handle both ESM and CJS exports
     if (config.default) config = config.default;
 } catch (e) {
-    // Fallback or error if config is missing
-    console.error('Error loading config:', e.message);
-    console.error('Error: config.cjs not found. Please copy config.example.cjs to config.cjs and add your Client ID.');
-    process.exit(1);
+    // Config missing is expected for first-time users using CLI only.
+    // We don't crash here - we just run without OAuth support (CLI fallback)
 }
-const QWEN_OAUTH_CLIENT_ID = config.QWEN_OAUTH_CLIENT_ID;
+const QWEN_OAUTH_CLIENT_ID = config.QWEN_OAUTH_CLIENT_ID || null;
 const QWEN_OAUTH_SCOPE = 'openid profile email model.completion';
 const QWEN_OAUTH_GRANT_TYPE = 'urn:ietf:params:oauth:grant-type:device_code';
 const QWEN_CHAT_API = 'https://chat.qwen.ai/api/chat/completions';
@@ -165,6 +163,10 @@ class QwenOAuth {
      */
     async startDeviceFlow() {
         console.log('Starting Qwen Device Code Flow with PKCE...');
+
+        if (!QWEN_OAUTH_CLIENT_ID) {
+            throw new Error('Missing Client ID. Please copy config.example.cjs to config.cjs and add your QWEN_OAUTH_CLIENT_ID to use this feature.');
+        }
 
         // Generate PKCE pair
         this.codeVerifier = generateCodeVerifier();
