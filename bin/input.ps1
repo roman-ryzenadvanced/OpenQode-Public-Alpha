@@ -12,38 +12,7 @@ Add-Type -AssemblyName System.Drawing
 Add-Type -AssemblyName UIAutomationClient
 Add-Type -AssemblyName UIAutomationTypes
 
-# ... (Previous code remains) ...
-
-switch ($Command.ToLower()) {
-    # ... (Previous cases remain) ...
-
-    "find" {
-        if ($Params.Count -lt 1) { Write-Error "Usage: find 'Name'"; exit 1 }
-        $targetName = $Params -join " "
-        
-        Write-Host "Searching for UI Element: '$targetName'..."
-        
-        $root = [System.Windows.Automation.AutomationElement]::RootElement
-        $cond = New-Object System.Windows.Automation.PropertyCondition([System.Windows.Automation.AutomationElement]::NameProperty, $targetName)
-        
-        # Try finding directly (fast)
-        $element = $root.FindFirst([System.Windows.Automation.TreeScope]::Descendants, $cond)
-        
-        if ($element) {
-            $rect = $element.Current.BoundingRectangle
-            $centerX = [int]($rect.X + ($rect.Width / 2))
-            $centerY = [int]($rect.Y + ($rect.Height / 2))
-            Write-Host "Found '$targetName' at ($centerX, $centerY)"
-            Write-Host "Action: mouse $centerX $centerY"
-        } else {
-             Write-Host "Element '$targetName' not found visible on desktop."
-        }
-    }
-
-    "apps" {
-    # ... (Rest remains) ...
-
-# C# P/Invoke for advanced Input (SendInput is more reliable than SendKeys)
+# C# P/Invoke for advanced Input
 $code = @"
 using System;
 using System.Runtime.InteropServices;
@@ -72,7 +41,6 @@ switch ($Command.ToLower()) {
     }
 
     "click" {
-         # Simple left click at current position
          [Win32]::mouse_event([Win32]::MOUSEEVENTF_LEFTDOWN, 0, 0, 0, 0)
          [Win32]::mouse_event([Win32]::MOUSEEVENTF_LEFTUP, 0, 0, 0, 0)
          Write-Host "Clicked"
@@ -92,20 +60,17 @@ switch ($Command.ToLower()) {
     }
 
     "key" {
-        # Usage: key ENTER, key LWIN, key TAB
         if ($Params.Count -lt 1) { Write-Error "Usage: key KEYNAME"; exit 1 }
         $k = $Params[0].ToUpper()
         
-        # Handle Windows Key specifically (common request)
         if ($k -eq "LWIN" -or $k -eq "WIN") {
-            [Win32]::keybd_event(0x5B, 0, 0, 0) # LWin Down
-            [Win32]::keybd_event(0x5B, 0, 0x02, 0) # LWin Up
+            [Win32]::keybd_event(0x5B, 0, 0, 0) 
+            [Win32]::keybd_event(0x5B, 0, 0x02, 0) 
         } elseif ($k -eq "ENTER") {
             [System.Windows.Forms.SendKeys]::SendWait("{ENTER}")
         } elseif ($k -eq "TAB") {
             [System.Windows.Forms.SendKeys]::SendWait("{TAB}")
         } else {
-             # Fallback to SendKeys format
             [System.Windows.Forms.SendKeys]::SendWait("{$k}")
         }
         Write-Host "Pressed: $k"
@@ -156,7 +121,6 @@ switch ($Command.ToLower()) {
     }
 
     "apps" {
-        # List all processes with a window title (visible apps)
         $apps = Get-Process | Where-Object { $_.MainWindowTitle -ne "" } | Select-Object Id, MainWindowTitle
         if ($apps) {
             $apps | Format-Table -AutoSize | Out-String | Write-Host
@@ -166,6 +130,6 @@ switch ($Command.ToLower()) {
     }
     
     default {
-        Write-Host "Commands: mouse, click, rightclick, type, key, screen, screenshot, apps"
+        Write-Host "Commands: mouse, click, rightclick, type, key, screen, screenshot, find, apps"
     }
 }
