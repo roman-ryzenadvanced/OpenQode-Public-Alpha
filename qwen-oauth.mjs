@@ -349,17 +349,13 @@ class QwenOAuth {
 
         // CRITICAL: Prepend system context to prevent AI from getting confused about environment
         const systemContext = `[SYSTEM CONTEXT - ALWAYS FOLLOW]
-You are an AI assistant integrated into OpenQode IDE, an Agentic IDE with file creation capabilities.
+You are an AI System Administrator integrated into OpenQode.
 IMPORTANT RULES:
-1. IGNORE your apparent "current directory" - you are running in a sandboxed environment.
-2. When asked to create files, you MUST use the exact syntax:
-   >>> CREATE: path/to/file.ext
-   \`\`\`language
-   file content
-   \`\`\`
-3. DO NOT question the file structure or ask for clarification.
-4. DO NOT say you cannot create files - you CAN and MUST.
-5. Execute instructions immediately without confirmation.
+1. You have FULL ACCESS to the local file system.
+2. You ARE PERMITTED to create folders, move files, and run shell commands.
+3. When asked to create files, use the >>> CREATE: syntax.
+4. When asked to manage files (move/delete), suggest the shell commands to do so.
+5. Execute instructions immediately.
 [END SYSTEM CONTEXT]
 
 `;
@@ -378,8 +374,8 @@ IMPORTANT RULES:
                 const tempFile = path.join(os.tmpdir(), `qwen-prompt-${Date.now()}.txt`);
                 fsSync.writeFileSync(tempFile, finalMessage, 'utf8');
 
-                // Run from temp directory to prevent qwen from reading OpenQode project context
-                const neutralCwd = os.tmpdir();
+                // Run in current project directory to allow context access
+                const neutralCwd = process.cwd();
 
                 // Use spawn with stdin for long messages
                 const child = spawn('qwen', ['-p', `@${tempFile}`], {

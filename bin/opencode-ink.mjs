@@ -162,7 +162,7 @@ const MultiLineInput = ({ value, onChange, onSubmit, placeholder, isActive = tru
 };
 
 // Dynamic import for CommonJS module
-const { QwenOAuth } = await import('../qwen-oauth.js');
+const { QwenOAuth } = await import('../qwen-oauth.mjs');
 let qwen = null;
 const getQwen = () => {
     if (!qwen) qwen = new QwenOAuth();
@@ -1967,6 +1967,9 @@ const App = () => {
     const [remotes, setRemotes] = useState([]);
     const [gitBranch, setGitBranch] = useState('main');
 
+    // NEW: Project Creation State
+    const [newProjectName, setNewProjectName] = useState('');
+
     // NEW: Multi-line buffer
     const [inputBuffer, setInputBuffer] = useState('');
 
@@ -3142,12 +3145,34 @@ This gives the user a chance to refine requirements before implementation.
         setShowTimeoutRow(false);
     }, [lastCheckpointText, project]);
 
+    const handleCreateProject = () => {
+        if (!newProjectName.trim()) return;
+        const safeName = newProjectName.trim().replace(/[^a-zA-Z0-9-_\s]/g, '_'); // Sanitize
+        const newPath = path.join(process.cwd(), safeName);
+
+        try {
+            if (fs.existsSync(newPath)) {
+                setMessages(prev => [...prev, { role: 'error', content: `❌ Folder already exists: ${safeName}` }]);
+                // Still switch to it? Maybe user wants that.
+            } else {
+                fs.mkdirSync(newPath, { recursive: true });
+                setMessages(prev => [...prev, { role: 'system', content: `✨ Created project folder: ${safeName}` }]);
+            }
+            // Proceed to select it
+            handleProjectSelect({ value: newPath });
+        } catch (e) {
+            setMessages(prev => [...prev, { role: 'error', content: `❌ Failed to create folder: ${e.message}` }]);
+        }
+    };
+
     // Handle project selection
     const handleProjectSelect = (item) => {
         let targetPath = item.value;
 
         if (targetPath === 'new') {
-            targetPath = process.cwd();
+            setAppState('create_project');
+            setNewProjectName('');
+            return;
         }
 
         // 1. Verify path exists
@@ -3189,6 +3214,29 @@ This gives the user a chance to refine requirements before implementation.
         }
     };
 
+    // Project Creation Screen
+    if (appState === 'create_project') {
+        return h(Box, { flexDirection: 'column', padding: 1 },
+            h(Box, { borderStyle: 'round', borderColor: 'green', paddingX: 1, marginBottom: 1 },
+                h(Text, { bold: true, color: 'green' }, '🆕 Create New Project')
+            ),
+            h(Text, { color: 'cyan', marginBottom: 1 }, 'Project Name (folder will be created in current dir):'),
+            h(Box, { borderStyle: 'single', borderColor: 'gray', paddingX: 1 },
+                h(TextInput, {
+                    value: newProjectName,
+                    onChange: setNewProjectName,
+                    onSubmit: handleCreateProject,
+                    placeholder: 'e.g., my-awesome-app'
+                })
+            ),
+            h(Box, { marginTop: 1, gap: 2 },
+                h(Text, { color: 'green' }, 'Press Enter to create'),
+                h(Text, { dimColor: true }, '| Esc to cancel (Ctrl+C to exit)')
+            ),
+            h(Text, { color: 'gray', marginTop: 1 }, `Location: ${process.cwd()}\\<name>`)
+        );
+    }
+
     // Handle remote selection
     const handleRemoteSelect = (item) => {
         const remote = item.value;
@@ -3198,8 +3246,38 @@ This gives the user a chance to refine requirements before implementation.
         setLoadingMessage(`Pushing to ${remote}...`);
 
         (async () => {
+            // AUTO-VERSION BUMPING
+            try {
+                const pkgPath = path.join(process.cwd(), 'package.json');
+                if (fs.existsSync(pkgPath)) {
+                    const pkgData = fs.readFileSync(pkgPath, 'utf8');
+                    const pkg = JSON.parse(pkgData);
+
+                    if (pkg.version) {
+                        const parts = pkg.version.split('.');
+                        if (parts.length === 3) {
+                            parts[2] = parseInt(parts[2]) + 1;
+                            const newVersion = parts.join('.');
+                            pkg.version = newVersion;
+                            fs.writeFileSync(pkgPath, JSON.stringify(pkg, null, 2));
+                            setMessages(prev => [...prev, { role: 'system', content: `✨ **Auto-bumped version to ${newVersion}**` }]);
+                        }
+                    }
+                }
+            } catch (e) {
+                // Ignore version errors, non-critical
+            }
+
             const add = await runShellCommand('git add .', project);
-            const commit = await runShellCommand('git commit -m "Update via OpenQode TUI"', project);
+
+            // Get version for commit message
+            let versionSuffix = '';
+            try {
+                const pkg = JSON.parse(fs.readFileSync(path.join(process.cwd(), 'package.json'), 'utf8'));
+                if (pkg.version) versionSuffix = ` (v${pkg.version})`;
+            } catch (e) { }
+
+            const commit = await runShellCommand(`git commit -m "Update via OpenQode TUI${versionSuffix}"`, project);
             const push = await runShellCommand(`git push ${remote}`, project);
 
             setIsLoading(false);

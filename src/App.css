@@ -1,0 +1,162 @@
+/* Reset and base styles */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  line-height: 1.6;
+  color: #333;
+  background-color: #f5f5f5;
+}
+
+.container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 20px;
+}
+
+/* Header styles */
+.header {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  padding: 2rem 0;
+  text-align: center;
+}
+
+.header h1 {
+  font-size: 2.5rem;
+  margin-bottom: 0.5rem;
+  animation: fadeInDown 1s ease;
+}
+
+.header p {
+  font-size: 1.2rem;
+  opacity: 0.9;
+  animation: fadeInUp 1s ease;
+}
+
+/* Main content */
+.main-content {
+  min-height: calc(100vh - 200px);
+  display: flex;
+  flex-direction: column;
+}
+
+/* Hero section */
+.hero {
+  background: linear-gradient(rgba(0,0,0,0.5), rgba(0,0,0,0.5)), url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 100 100"><rect width="100" height="100" fill="%23667eea"/><circle cx="20" cy="20" r="10" fill="%23764ba2" opacity="0.2"/><circle cx="80" cy="80" r="10" fill="%23764ba2" opacity="0.2"/></svg>');
+  background-size: cover;
+  background-position: center;
+  padding: 4rem 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  text-align: center;
+}
+
+.content {
+  opacity: 0;
+  transform: translateY(20px);
+  transition: all 0.6s ease;
+}
+
+.content.loaded {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.content h2 {
+  font-size: 2.5rem;
+  margin-bottom: 1rem;
+}
+
+.content p {
+  font-size: 1.2rem;
+  margin-bottom: 2rem;
+  max-width: 600px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.cta-button {
+  background: linear-gradient(45deg, #ff6b6b, #ee5a24);
+  color: white;
+  border: none;
+  padding: 15px 30px;
+  font-size: 1.1rem;
+  border-radius: 50px;
+  cursor: pointer;
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.cta-button:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 20px rgba(0,0,0,0.2);
+}
+
+/* Features section */
+.features {
+  padding: 4rem 0;
+  background-color: white;
+}
+
+.feature-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 2rem;
+  margin-top: 2rem;
+}
+
+.feature-card {
+  text-align: center;
+  padding: 2rem;
+  background: #f8f9fa;
+  border-radius: 10px;
+  box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+  transition: transform 0.3s ease;
+}
+
+.feature-card:hover {
+  transform: translateY(-5px);
+}
+
+.feature-card h3 {
+  color: #667eea;
+  margin-bottom: 1rem;
+  font-size: 1.3rem;
+}
+
+/* Footer */
+.footer {
+  background-color: #333;
+  color: white;
+  text-align: center;
+  padding: 2rem 0;
+}
+
+/* Animations */
+@keyframes fadeInDown {
+  from {
+    opacity: 0;
+    transform: translateY(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
