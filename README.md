@@ -56,6 +56,8 @@ We recommend starting with **Next-Gen (Option 5)**!
 | **Interface** | **Full Dashboard** with Split Panes | Single Scrolling Stream |
 | **Visuals** | **Animated Borders**, RGB Pulse, Spinners | Static Text |
 | **Interactivity**| **Interactive Menus** (Arrow Keys Selection) | Command-based only |
+| **Computer Use** | **Command Execution** (Runs shell cmds) | Read-only |
+| **Projects** | **Any Absolute Path** (e.g. E:\MyProject) | Subfolders Only |
 | **Models** | **Visual Model Selector** (`/model`) | Manual Switch via CLI |
 | **Thinking** | **Real-time Stats** (CPS, Tokens) | Basic Loading |
 
