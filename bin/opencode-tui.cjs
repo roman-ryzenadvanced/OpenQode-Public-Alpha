@@ -683,7 +683,40 @@ function showProjectMenu() {
 }
 
 // Start with project menu
-showProjectMenu();
+// Start with auth check then project menu
+(async () => {
+    const qwen = getQwen();
+    const authed = await qwen.checkAuth();
+    if (!authed) {
+        print(`\n${c.yellow}Authentication required. Launching web login...${c.reset}\n`);
+
+        const authScript = path.join(__dirname, 'auth.js');
+
+        await new Promise((resolve) => {
+            const child = spawn('node', [authScript], {
+                stdio: 'inherit',
+                shell: false
+            });
+
+            child.on('close', (code) => {
+                if (code === 0) {
+                    print(`\n${c.green}Authentication successful! Starting TUI...${c.reset}\n`);
+                    resolve();
+                } else {
+                    print(`\n${c.red}Authentication failed or was cancelled.${c.reset}\n`);
+                    process.exit(1);
+                }
+            });
+        });
+
+        // Re-check auth
+        const recheck = await qwen.checkAuth();
+        if (!recheck) {
+            process.exit(1);
+        }
+    }
+    showProjectMenu();
+})();
 
 function prompt() {
     const promptStr = selectingAgent ? `${c.cyan}#${c.reset} ` : `${c.green}❯${c.reset} `;
