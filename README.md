@@ -68,24 +68,28 @@ We recommend starting with **Next-Gen (Option 5)**!
 
 ---
 
-## 🤖 SmartX Engine & Auto-Approve
+## 🧠 Intelligent Features
 
-OpenQode Gen 5 introduces powerful automation features for hands-free coding:
+OpenQode Gen 5 introduces a powerful suite of intelligent automation features designed for maximum productivity:
 
 ![Features Panel](assets/features-panel.png)
 
-### 🚀 SmartX Engine
-When enabled, the AI operates autonomously - executing commands, writing files, and fixing errors without constant prompts.
-- Toggle via `/smartx on` or `/smartx off`
-- Visible in sidebar: `SmartX: ON` (magenta)
+### 🔀 Multi-Agent Mode (`/agents`)
+Enables dynamic multi-agent orchestration. The AI intelligently selects and coordinates specialized agents based on your project's requirements—from code generation to debugging, testing, and documentation—all working in concert.
 
-### ⚡ Auto-Approve (AutoRun)
-Automatically approve and execute AI-suggested commands without Y/N confirmation.
-- Toggle via `/auto`
-- Visible in sidebar: `AutoRun: ON` (yellow)
-- **Best used with SmartX Engine** for fully autonomous operation
+### 🧩 Smart Context (`/context`)
+Persistent context sharing across agents and sessions. Your conversation history, project state, and decisions are preserved—even after restarting the TUI. Multiple agents can seamlessly share context for coherent, continuous collaboration.
 
-> 💡 **Tip:** Press `ESC` at any time to abort a running command!
+### 💭 Exposed Thinking (`/thinking`)
+Transparency mode that reveals the AI's reasoning process in real-time. Watch as the agent analyzes problems, considers alternatives, and formulates solutions—giving you insight into every decision.
+
+### 🚀 SmartX Engine (`/smartx`)
+Autonomous error-recovery mode. When enabled, the AI will **automatically retry and heal** from errors rather than stopping to ask for input. Failed commands, broken builds, and runtime errors are diagnosed and fixed in a continuous loop until resolved.
+
+### ⚡ AutoRun (`/auto`)
+System-level autonomous execution. An extension of SmartX that grants the AI permission to perform file operations, run shell commands, and manage server tasks **without requiring manual approval**. Perfect for hands-free automation workflows.
+
+> 💡 **Pro Tip:** Combine **SmartX + AutoRun** for fully autonomous coding sessions. Press `ESC` at any time to abort!
 
 ---
 
