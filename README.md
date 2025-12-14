@@ -72,7 +72,7 @@ We recommend starting with **Next-Gen (Option 5)**!
 
 OpenQode Gen 5 introduces a powerful suite of intelligent automation features designed for maximum productivity:
 
-![Features Panel](assets/features-panel.png)
+![Features Panel](assets/features-smartx.png)
 
 ### 🔀 Multi-Agent Mode (`/agents`)
 Enables dynamic multi-agent orchestration. The AI intelligently selects and coordinates specialized agents based on your project's requirements—from code generation to debugging, testing, and documentation—all working in concert.
