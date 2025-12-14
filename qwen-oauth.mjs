@@ -12,6 +12,7 @@ import { readFile, writeFile, unlink } from 'fs/promises';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { createRequire } from 'module';
+import { fetchWithRetry } from './lib/retry-handler.mjs';
 
 // ESM __dirname equivalent
 const __filename = fileURLToPath(import.meta.url);
@@ -335,8 +336,9 @@ class QwenOAuth {
      * @param {string} model - The model to use
      * @param {object} imageData - Optional image data
      * @param {function} onChunk - Optional callback for streaming output (chunk) => void
+     * @param {string} systemPrompt - Optional system prompt to override/prepend
      */
-    async sendMessage(message, model = 'qwen-coder-plus', imageData = null, onChunk = null) {
+    async sendMessage(message, model = 'qwen-coder-plus', imageData = null, onChunk = null, systemPrompt = null) {
         // If we have image data, always use the Vision API
         if (imageData) {
             console.log('📷 Image data detected, using Vision API...');
@@ -348,8 +350,14 @@ class QwenOAuth {
         const os = await import('os');
         const fsSync = await import('fs');
 
-        // CRITICAL: Prepend system context to prevent AI from getting confused about environment
-        const systemContext = `[SYSTEM CONTEXT - ALWAYS FOLLOW]
+        let finalMessage = message;
+
+        // If systemPrompt is provided (New Flow), use it directly + message
+        if (systemPrompt) {
+            finalMessage = systemPrompt + '\n\n' + message;
+        } else {
+            // Legacy Flow: Prepend hardcoded context for specific keywords
+            const systemContext = `[SYSTEM CONTEXT - ALWAYS FOLLOW]
 You are an AI System Administrator integrated into OpenQode.
 IMPORTANT RULES:
 1. You have FULL ACCESS to the local file system.
@@ -360,17 +368,15 @@ IMPORTANT RULES:
 [END SYSTEM CONTEXT]
 
 `;
-
-        // Prepend system context ONLY for build/create commands (detected by keywords)
-        let finalMessage = message;
-        const lowerMsg = message.toLowerCase();
-        if (message.includes('CREATE:') ||
-            message.includes('ROLE:') ||
-            message.includes('Generate all necessary files') ||
-            lowerMsg.includes('open ') ||
-            lowerMsg.includes('run ') ||
-            lowerMsg.includes('computer use')) {
-            finalMessage = systemContext + message;
+            const lowerMsg = message.toLowerCase();
+            if (message.includes('CREATE:') ||
+                message.includes('ROLE:') ||
+                message.includes('Generate all necessary files') ||
+                lowerMsg.includes('open ') ||
+                lowerMsg.includes('run ') ||
+                lowerMsg.includes('computer use')) {
+                finalMessage = systemContext + message;
+            }
         }
 
         return new Promise((resolve) => {
@@ -513,7 +519,7 @@ IMPORTANT RULES:
                 stream: false
             };
 
-            const response = await fetch(QWEN_CHAT_API, {
+            const response = await fetchWithRetry(QWEN_CHAT_API, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -557,7 +563,7 @@ The Qwen Vision API needs OAuth authentication to analyze images. The current se
 **To enable image analysis:**
 1. Click "Authenticate Qwen" button to re-authenticate
 2. Or describe what's in your image and I'll help without viewing it
-
+ 
 *Your image was received (${(imageData?.length / 1024).toFixed(1)} KB) but couldn't be processed without Vision API tokens.*`,
                     usage: null
                 };

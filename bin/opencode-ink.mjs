@@ -51,6 +51,7 @@ import { getContextManager } from '../lib/context-manager.mjs';
 import { getAllSkills, getSkill, executeSkill, getSkillListDisplay } from '../lib/skills.mjs';
 import { getDebugLogger, initFromArgs } from '../lib/debug-logger.mjs';
 import { processCommand, isCommand } from '../lib/command-processor.mjs';
+import { fetchWithRetry } from '../lib/retry-handler.mjs';
 import {
     getSystemPrompt,
     formatCodeBlock,
@@ -455,7 +456,7 @@ const callOpenCodeFree = async (prompt, model = currentFreeModel, onChunk = null
     }
 
     try {
-        const response = await fetch(OPENCODE_FREE_API, {
+        const response = await fetchWithRetry(OPENCODE_FREE_API, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -3465,17 +3466,13 @@ const App = () => {
 
         try {
             // Build context-aware prompt with agent-specific instructions
-            let systemPrompt = `[SYSTEM CONTEXT]
- CURRENT WORKING DIRECTORY: ${process.cwd()}
- (CRITICAL: This is the ABSOLUTE SOURCE OF TRUTH. Ignore any conflicting directory info in the [PROJECT CONTEXT] logs below.)
-
- ` + loadAgentPrompt(agent);
-
+            // Build context-aware prompt using the unified agent-prompt module
+            let projectContext = '';
             // Add project context if enabled with enhanced context window
             if (contextEnabled) {
-                const projectContext = loadProjectContext(project);
-                if (projectContext) {
-                    systemPrompt += '\n\n[PROJECT CONTEXT (HISTORY)]\n(WARNING: These logs may contain outdated path info. Trust SYSTEM CONTEXT CWD above over this.)\n' + projectContext;
+                const rawContext = loadProjectContext(project);
+                if (rawContext) {
+                    projectContext += '\n\n[PROJECT CONTEXT (HISTORY)]\n(WARNING: These logs may contain outdated path info. Trust SYSTEM CONTEXT CWD above over this.)\n' + rawContext;
                 }
 
                 // Enhanced context: Include recent conversation history for better continuity
@@ -3485,174 +3482,99 @@ const App = () => {
                         const recentContext = recentMessages.map(m =>
                             `[PREVIOUS ${m.role.toUpperCase()}]: ${m.content.substring(0, 500)}` // Limit to prevent overflow
                         ).join('\n');
-                        systemPrompt += `\n\n[RECENT CONVERSATION]\n${recentContext}\n(Use this for context continuity, but prioritize the current request)`;
+                        projectContext += `\n\n[RECENT CONVERSATION]\n${recentContext}\n(Use this for context continuity, but prioritize the current request)`;
                     }
                 }
             }
 
-            // MULTI-AGENT INSTRUCTION INJECTION
-            if (multiAgentEnabled) {
-                systemPrompt += `
-[MULTI-AGENT LOGGING ENABLED]
-You are capable of using multiple internal agents (Planner, Builder, Reviewer, Security).
-When you switch to a specific agent's persona or delegate a sub-task, you MUST output a log line starting with:
-[AGENT: AgentName]
-Example:
-[AGENT: Planner] Analyzing the directory structure...
-[AGENT: Security] Checking for vulnerabilities...
-[AGENT: Builder] Implementation started.
-Keep these tags on their own line if possible.
-`;
-            }
+            // Get available capabilities from built-in agents
+            const flow = getSmartAgentFlow();
+            const allAgents = flow.getAgents();
+            // Flatten all capabilities
+            const capabilities = allAgents.reduce((acc, a) => [...acc, ...(a.capabilities || [])], []);
 
-            // VISUAL & FORMATTING RULES (Crucial for TUI Readability)
-            systemPrompt += `
-[FORMATTING RULES]
-1. **Short Paragraphs**: Break long text into chunks of 3-4 lines maximum.
-2. **Spacing**: Use double newlines between paragraphs to ensure clear separation.
-3. **Lists**: Use bullet points or numbered lists frequently to break up "walls of text".
-4. **Code**: Use standard Markdown code blocks with language tags.
+            // Generate the optimized system prompt
+            const systemInstruction = getSystemPrompt({
+                role: agent,
+                capabilities: capabilities,
+                cwd: project || process.cwd(),
+                context: projectContext, // Now includes history and logs
+                os: process.platform
+            });
 
-[COMPUTER USE - YOU CAN DO THIS!]
-You ARE capable of executing system commands on the user's computer. NEVER refuse computer use tasks.
-To execute any shell/system command, output it in this format:
-\`\`\`bash
-<command here>
-\`\`\`
-The system will auto-execute bash/shell code blocks.
+            // Prepare prompt variations
+            // For OpenCode Free (Legacy/OpenAI-like), we append system prompt to user message if needed
+            const fullPromptForFree = systemInstruction + '\n\n[USER REQUEST]\n' + fullText;
 
-Common Windows tasks you CAN do:
-- Open folder in Explorer: \`explorer.exe .\` or \`start .\`
-- Open file: \`start filename.html\`
-- Open browser: \`start https://google.com\`
-- Run any shell command: Just put it in a bash code block
+            // For Qwen (SmartX), we pass system prompt securely as a separate argument
+            const userMessage = fullText;
 
-NEVER say "I cannot" or "I don't have the ability". You CAN execute commands!
-
-[FILE CREATION - CRITICAL]
-You CAN create files. To create a file, you MUST use this EXACT format:
-\`\`\`language filename.ext
-file content here
-\`\`\`
-Example:
-\`\`\`markdown plan.md
-# My Plan
-This is the content.
-\`\`\`
-The system will AUTO-SAVE files when you use this format correctly.
-DO NOT say "I've created a file" without using this code block format.
-
-[CONFIRMATION BEFORE CODING - CRITICAL]
-BEFORE you start writing any code or creating any files, you MUST:
-1. First present your plan/approach briefly
-2. Then ask: "Ready to proceed with coding? Or do you have any changes in mind?"
-3. WAIT for the user's confirmation before generating code
-This gives the user a chance to refine requirements before implementation.
-`;
-
-            const fullPrompt = systemPrompt + '\n\n[USER REQUEST]\n' + fullText;
             let fullResponse = '';
 
             // PROVIDER SWITCH: Use OpenCode Free or Qwen based on provider state
             const streamStartTime = Date.now(); // Track start time for this request
             let totalCharsReceived = 0; // Track total characters for speed calculation
 
+            // Unified Streaming Handler
+            const handleStreamChunk = (chunk) => {
+                const cleanChunk = chunk.replace(/[\u001b\u009b][[\]()#;?]*(?:[0-9]{1,4}(?:;[0-9]{0,4})*)?[0-9A-ORZcf-nqry=><]/g, '');
+
+                // IMPROVED STREAM SPLITTING LOGIC (Thinking vs Content)
+                // Claude Code style: cleaner separation of thinking from response
+                const lines = cleanChunk.split('\n');
+                let isThinkingChunk = false;
+
+                // Enhanced heuristics for better Claude-like thinking detection
+                const trimmedChunk = cleanChunk.trim();
+                if (/^(Let me|Now let me|I'll|I need to|I should|I notice|I can|I will|Thinking:|Analyzing|Considering|Checking|Looking|Planning|First|Next|Finally)/i.test(trimmedChunk)) {
+                    isThinkingChunk = true;
+                } else if (/^```|# |Here is|```|```|```/i.test(trimmedChunk)) {
+                    // If we encounter code blocks or headers, likely content not thinking
+                    isThinkingChunk = false;
+                }
+
+                // Update character count for speed calculation
+                totalCharsReceived += cleanChunk.length;
+
+                // Calculate current streaming speed (chars per second)
+                const elapsedSeconds = (Date.now() - streamStartTime) / 1000;
+                const speed = elapsedSeconds > 0 ? Math.round(totalCharsReceived / elapsedSeconds) : 0;
+
+                // GLOBAL STATS UPDATE (Run for ALL chunks)
+                setThinkingStats(prev => ({
+                    ...prev,
+                    chars: totalCharsReceived,
+                    speed: speed
+                }));
+
+                // GLOBAL AGENT DETECTION (Run for ALL chunks)
+                const agentMatch = cleanChunk.match(/\[AGENT:\s*([^\]]+)\]/i);
+                if (agentMatch) {
+                    setThinkingStats(prev => ({ ...prev, activeAgent: agentMatch[1].trim() }));
+                }
+
+                if (isThinkingChunk) {
+                    setThinkingLines(prev => [...prev, ...lines.map(l => l.trim()).filter(l => l && !/^(Let me|Now let me|I'll|I need to|I notice)/i.test(l.trim()))]);
+                } else {
+                    setMessages(prev => {
+                        const last = prev[prev.length - 1];
+                        if (last && last.role === 'assistant') {
+                            return [...prev.slice(0, -1), { ...last, content: last.content + cleanChunk }];
+                        }
+                        return prev;
+                    });
+                }
+            };
+
             const result = provider === 'opencode-free'
-                ? await callOpenCodeFree(fullPrompt, freeModel, (chunk) => {
-                    const cleanChunk = chunk.replace(/[\u001b\u009b][[\]()#;?]*(?:[0-9]{1,4}(?:;[0-9]{0,4})*)?[0-9A-ORZcf-nqry=><]/g, '');
-
-                    // IMPROVED STREAM SPLITTING LOGIC (Thinking vs Content)
-                    // Claude Code style: cleaner separation of thinking from response
-                    const lines = cleanChunk.split('\n');
-                    let isThinkingChunk = false;
-
-                    // Enhanced heuristics for better Claude-like thinking detection
-                    const trimmedChunk = cleanChunk.trim();
-                    if (/^(Let me|Now let me|I'll|I need to|I should|I notice|I can|I will|Thinking:|Analyzing|Considering|Checking|Looking|Planning|First|Next|Finally)/i.test(trimmedChunk)) {
-                        isThinkingChunk = true;
-                    } else if (/^```|# |Here is|```|```|```/i.test(trimmedChunk)) {
-                        // If we encounter code blocks or headers, likely content not thinking
-                        isThinkingChunk = false;
-                    }
-
-                    // Update character count for speed calculation
-                    totalCharsReceived += cleanChunk.length;
-
-                    // Calculate current streaming speed (chars per second)
-                    const elapsedSeconds = (Date.now() - streamStartTime) / 1000;
-                    const speed = elapsedSeconds > 0 ? Math.round(totalCharsReceived / elapsedSeconds) : 0;
-
-                    // GLOBAL STATS UPDATE (Run for ALL chunks)
-                    setThinkingStats(prev => ({
-                        ...prev,
-                        chars: totalCharsReceived,
-                        speed: speed
-                    }));
-
-                    // GLOBAL AGENT DETECTION (Run for ALL chunks)
-                    const agentMatch = cleanChunk.match(/\[AGENT:\s*([^\]]+)\]/i);
-                    if (agentMatch) {
-                        setThinkingStats(prev => ({ ...prev, activeAgent: agentMatch[1].trim() }));
-                    }
-
-                    if (isThinkingChunk) {
-                        setThinkingLines(prev => [...prev, ...lines.map(l => l.trim()).filter(l => l && !/^(Let me|Now let me|I'll|I need to|I notice)/i.test(l.trim()))]);
-                    } else {
-                        setMessages(prev => {
-                            const last = prev[prev.length - 1];
-                            if (last && last.role === 'assistant') {
-                                return [...prev.slice(0, -1), { ...last, content: last.content + cleanChunk }];
-                            }
-                            return prev;
-                        });
-                    }
-                })
-                : await getQwen().sendMessage(fullPrompt, 'qwen-coder-plus', null, (chunk) => {
-                    const cleanChunk = chunk.replace(/[\u001b\u009b][[\]()#;?]*(?:[0-9]{1,4}(?:;[0-9]{0,4})*)?[0-9A-ORZcf-nqry=><]/g, '');
-
-                    // IMPROVED STREAM SPLITTING LOGIC (Thinking vs Content)
-                    const lines = cleanChunk.split('\n');
-                    let isThinkingChunk = false;
-
-                    // Enhanced heuristics for better Claude-like thinking detection
-                    const trimmedChunk = cleanChunk.trim();
-                    if (/^(Let me|Now let me|I'll|I need to|I should|I notice|I can|I will|Thinking:|Analyzing|Considering|Checking|Looking|Planning|First|Next|Finally)/i.test(trimmedChunk)) {
-                        isThinkingChunk = true;
-                    } else if (/^```|# |Here is|```|```|```/i.test(trimmedChunk)) {
-                        // If we encounter code blocks or headers, likely content not thinking
-                        isThinkingChunk = false;
-                    }
-
-                    // Update character count for speed calculation (using same variable as OpenCode path)
-                    totalCharsReceived += cleanChunk.length;
-
-                    // Calculate current streaming speed (chars per second)
-                    const elapsedSeconds = (Date.now() - streamStartTime) / 1000;
-                    const speed = elapsedSeconds > 0 ? Math.round(totalCharsReceived / elapsedSeconds) : 0;
-
-                    setThinkingStats(prev => ({
-                        ...prev,
-                        chars: totalCharsReceived,
-                        speed: speed
-                    }));
-
-                    const agentMatch = cleanChunk.match(/\[AGENT:\s*([^\]]+)\]/i);
-                    if (agentMatch) {
-                        setThinkingStats(prev => ({ ...prev, activeAgent: agentMatch[1].trim() }));
-                    }
-
-                    if (isThinkingChunk) {
-                        setThinkingLines(prev => [...prev, ...lines.map(l => l.trim()).filter(l => l && !/^(Let me|Now let me|I'll|I need to|I notice)/i.test(l.trim()))]);
-                    } else {
-                        setMessages(prev => {
-                            const last = prev[prev.length - 1];
-                            if (last && last.role === 'assistant') {
-                                return [...prev.slice(0, -1), { ...last, content: last.content + cleanChunk }];
-                            }
-                            return prev;
-                        });
-                    }
-                });
+                ? await callOpenCodeFree(fullPromptForFree, freeModel, handleStreamChunk)
+                : await getQwen().sendMessage(
+                    userMessage,
+                    'qwen-coder-plus',
+                    null,
+                    handleStreamChunk,
+                    systemInstruction // Pass dynamic system prompt!
+                );
 
             if (result.success) {
                 const responseText = result.response || fullResponse;
@@ -3701,17 +3623,17 @@ This gives the user a chance to refine requirements before implementation.
                             return next;
                         });
 
+                        const successMsg = formatSuccess(`Auto-saved ${successFiles.length} file(s):\n` + successFiles.map(f => formatFileOperation(f.path, 'Saved', 'success')).join('\n'));
                         setMessages(prev => [...prev, {
                             role: 'system',
-                            content: '✅ Auto-saved ' + successFiles.length + ' file(s):\n' +
-                                successFiles.map(f => '  📄 ' + f.path).join('\n')
+                            content: successMsg
                         }]);
                     }
                     if (failedFiles.length > 0) {
+                        const failureMsg = formatError(`Failed to save ${failedFiles.length} file(s):\n` + failedFiles.map(f => `  ⚠️ ${f.filename}: ${f.error}`).join('\n'));
                         setMessages(prev => [...prev, {
-                            role: 'system',
-                            content: '❌ Failed to save ' + failedFiles.length + ' file(s):\n' +
-                                failedFiles.map(f => '  ⚠️ ' + f.filename + ': ' + f.error).join('\n')
+                            role: 'error',
+                            content: failureMsg
                         }]);
                     }
 

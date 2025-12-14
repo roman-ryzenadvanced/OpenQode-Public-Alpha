@@ -114,6 +114,12 @@ We recommend starting with **Next-Gen (Option 5)**!
 
 OpenQode Gen 5 introduces a powerful suite of intelligent automation features designed for maximum productivity:
 
+### 🧠 Core Intelligence v2
+- **Dynamic System Prompting**: Context-aware prompts that adapt to your project, OS, and active agents.
+- **Robust API Resilience**: Enhanced retry mechanisms for Vision API and network instability.
+- **Smart TUI Formatters**: Cleaner, bordered output for file operations and success messages.
+
+
 ![Features Panel](assets/features-smartx.png)
 
 ### 🔀 Multi-Agent Mode (`/agents`)
