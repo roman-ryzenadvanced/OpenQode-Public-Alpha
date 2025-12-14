@@ -2289,6 +2289,10 @@ const App = () => {
     const [showCommandPalette, setShowCommandPalette] = useState(false);
     const [paletteFilter, setPaletteFilter] = useState(''); // For search
 
+    // SKILL SELECTOR: Overlay for selecting skills
+    const [showSkillSelector, setShowSkillSelector] = useState(false);
+    const [activeSkill, setActiveSkill] = useState(null);
+
     // PRO PROTOCOL: Run state management
     const [currentRun, setCurrentRun] = useState(null);
 
@@ -2622,28 +2626,25 @@ const App = () => {
                     return;
                 }
 
-                case '/skills': {
-                    const display = getSkillListDisplay();
-                    setMessages(prev => [...prev, { role: 'system', content: `🎯 **Available Skills**\n${display}\nUsage: /skill <name> then describe your task` }]);
-                    setInput('');
-                    return;
-                }
-
+                case '/skills':
                 case '/skill': {
                     if (!arg) {
+                        // Open skill selector
+                        setShowSkillSelector(true);
+                        setInput('');
+                        return;
+                    }
+                    // Direct skill activation with argument
+                    const skillName = arg.split(/\s+/)[0];
+                    const skill = getSkill(skillName);
+                    if (!skill) {
                         const skills = getAllSkills();
                         const names = skills.map(s => s.id).join(', ');
-                        setMessages(prev => [...prev, { role: 'system', content: `❌ Usage: /skill <name>\nAvailable: ${names}` }]);
+                        setMessages(prev => [...prev, { role: 'system', content: `❌ Unknown skill: "${skillName}"\nAvailable: ${names}\n\nUse /skills to see the full list.` }]);
                     } else {
-                        const skillName = arg.split(/\s+/)[0];
-                        const skill = getSkill(skillName);
-                        if (!skill) {
-                            const skills = getAllSkills();
-                            const names = skills.map(s => s.id).join(', ');
-                            setMessages(prev => [...prev, { role: 'system', content: `❌ Unknown skill: "${skillName}"\nAvailable: ${names}` }]);
-                        } else {
-                            setMessages(prev => [...prev, { role: 'system', content: `🎯 **Activated: ${skill.name}**\n${skill.description}\n\nNow describe your task and I'll apply this skill.` }]);
-                        }
+                        // Inject skill prompt into system for next message
+                        setActiveSkill(skill);
+                        setMessages(prev => [...prev, { role: 'system', content: `🎯 **Activated: ${skill.name}**\n${skill.description}\n\nNow describe your task and I'll apply this skill.` }]);
                     }
                     setInput('');
                     return;
@@ -4136,6 +4137,80 @@ This gives the user a chance to refine requirements before implementation.
             h(SelectInput, { items: agentOptions, onSelect: handleAgentSelect }),
             h(Box, { marginTop: 1 },
                 h(Text, { dimColor: true }, 'Esc to cancel')
+            )
+        );
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // SKILL SELECTOR OVERLAY - Scrollable skill picker
+    // ═══════════════════════════════════════════════════════════════
+    if (showSkillSelector && appState === 'chat') {
+        const skills = getAllSkills();
+        const skillItems = skills.map(skill => ({
+            label: `${getCategoryEmoji(skill.category)} ${skill.id.padEnd(20)} ${skill.name}`,
+            value: skill.id,
+            skill: skill
+        }));
+
+        // Category emoji helper
+        function getCategoryEmoji(cat) {
+            const emojis = {
+                design: '🎨',
+                documents: '📄',
+                development: '💻',
+                testing: '🧪',
+                writing: '✍️',
+                creative: '🎭',
+                documentation: '📚',
+                meta: '🔧'
+            };
+            return emojis[cat] || '📌';
+        }
+
+        const handleSkillSelect = (item) => {
+            setShowSkillSelector(false);
+            setActiveSkill(item.skill);
+            setMessages(prev => [...prev, {
+                role: 'system',
+                content: `🎯 **Activated: ${item.skill.name}**\n${item.skill.description}\n\nNow describe your task and I'll apply this skill.`
+            }]);
+        };
+
+        // Handle ESC to close
+        useInput((input, key) => {
+            if (key.escape) {
+                setShowSkillSelector(false);
+            }
+        }, { isActive: showSkillSelector });
+
+        return h(Box, {
+            flexDirection: 'column',
+            borderStyle: 'round',
+            borderColor: 'magenta',
+            padding: 1,
+            width: Math.min(55, columns - 4),
+        },
+            // Header
+            h(Text, { color: 'magenta', bold: true }, '🎯 Select a Skill'),
+            h(Text, { color: 'gray', dimColor: true }, 'Use ↑↓ to navigate, Enter to select'),
+
+            // Skill list with SelectInput
+            h(Box, { flexDirection: 'column', marginTop: 1, height: Math.min(18, rows - 8) },
+                h(SelectInput, {
+                    items: skillItems,
+                    onSelect: handleSkillSelect,
+                    itemComponent: ({ isSelected, label }) =>
+                        h(Text, {
+                            color: isSelected ? 'magenta' : 'white',
+                            bold: isSelected
+                        }, isSelected ? `❯ ${label}` : `  ${label}`)
+                })
+            ),
+
+            // Footer with categories
+            h(Box, { marginTop: 1, flexDirection: 'column' },
+                h(Text, { dimColor: true }, 'Categories: 🎨Design 📄Docs 💻Dev 🧪Test ✍️Write'),
+                h(Text, { dimColor: true }, 'Esc to close')
             )
         );
     }
