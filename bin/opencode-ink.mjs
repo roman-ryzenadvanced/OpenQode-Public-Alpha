@@ -4180,117 +4180,146 @@ This gives the user a chance to refine requirements before implementation.
             { label: '/exit         Exit TUI', value: '/exit' }
         ];
 
-        // Filter commands based on search
-        const filter = paletteFilter.toLowerCase();
-        const filteredCommands = filter
-            ? allCommands.filter(c => c.label.toLowerCase().includes(filter))
-            : allCommands;
-
-        const handleCommandSelect = (item) => {
-            setShowCommandPalette(false);
-            setPaletteFilter(''); // Reset filter
-            setInput(item.value);
-        };
-
-        // Settings with current state
-        const settingsSection = [
-            {
-                name: 'Multi-Agent Mode',
-                value: multiAgentEnabled,
-                onCmd: '/agents on',
-                offCmd: '/agents off'
-            },
-            {
-                name: 'Smart Context',
-                value: contextEnabled,
-                onCmd: '/context',
-                offCmd: '/context'
-            },
-            {
-                name: 'Exposed Thinking',
-                value: exposedThinking,
-                onCmd: '/thinking on',
-                offCmd: '/thinking off'
-            },
-            {
-                name: 'SmartX Engine',
-                value: soloMode,
-                onCmd: '/smartx on',
-                offCmd: '/smartx off'
-            },
-            {
-                name: 'Auto-Approve',
-                value: autoApprove,
-                onCmd: '/auto',
-                offCmd: '/auto'
-            }
+        // Create all menu items with proper grouping and actions
+        const menuItems = [
+            // ═══════════════════════════════════════════════════════════════
+            // TOGGLES (direct action on select)
+            // ═══════════════════════════════════════════════════════════════
+            { label: `⚙ SmartX Engine      ${soloMode ? '🟢 ON' : '⚫ OFF'}`, value: 'toggle_smartx', action: 'toggle' },
+            { label: `⚙ Auto-Approve       ${autoApprove ? '🟢 ON' : '⚫ OFF'}`, value: 'toggle_auto', action: 'toggle' },
+            { label: `⚙ Multi-Agent        ${multiAgentEnabled ? '🟢 ON' : '⚫ OFF'}`, value: 'toggle_agents', action: 'toggle' },
+            { label: `⚙ Smart Context      ${contextEnabled ? '🟢 ON' : '⚫ OFF'}`, value: 'toggle_context', action: 'toggle' },
+            { label: `⚙ Exposed Thinking   ${exposedThinking ? '🟢 ON' : '⚫ OFF'}`, value: 'toggle_thinking', action: 'toggle' },
+            { label: `⚙ Debug Logging      ${debugLogger.enabled ? '🟢 ON' : '⚫ OFF'}`, value: 'toggle_debug', action: 'toggle' },
+            { label: '─────────────────────────────', value: 'sep1', action: 'noop' },
+            // ═══════════════════════════════════════════════════════════════
+            // MEMORY COMMANDS
+            // ═══════════════════════════════════════════════════════════════
+            { label: '📝 /remember        Save to Memory', value: '/remember ', action: 'input' },
+            { label: '📝 /memory          View Memory', value: '/memory', action: 'cmd' },
+            { label: '📝 /forget           Remove Fact', value: '/forget ', action: 'input' },
+            { label: '─────────────────────────────', value: 'sep2', action: 'noop' },
+            // ═══════════════════════════════════════════════════════════════
+            // SKILLS
+            // ═══════════════════════════════════════════════════════════════
+            { label: '🎯 /skills           List Skills', value: '/skills', action: 'cmd' },
+            { label: '🎯 /skill            Use a Skill', value: '/skill ', action: 'input' },
+            { label: '─────────────────────────────', value: 'sep3', action: 'noop' },
+            // ═══════════════════════════════════════════════════════════════
+            // AGENTS
+            // ═══════════════════════════════════════════════════════════════
+            { label: '🤖 /agents           Agent Menu', value: '/agents', action: 'cmd' },
+            { label: '🤖 /plan             Planner Agent', value: '/plan', action: 'cmd' },
+            { label: '🤖 /model            Change Model', value: '/model', action: 'cmd' },
+            { label: '─────────────────────────────', value: 'sep4', action: 'noop' },
+            // ═══════════════════════════════════════════════════════════════
+            // SESSION
+            // ═══════════════════════════════════════════════════════════════
+            { label: '💾 /save             Save Session', value: '/save ', action: 'input' },
+            { label: '📂 /load             Load Session', value: '/load ', action: 'input' },
+            { label: '📋 /paste            Clipboard Paste', value: '/paste', action: 'cmd' },
+            { label: '📁 /project          Project Info', value: '/project', action: 'cmd' },
+            { label: '✍️ /write            Write Files', value: '/write', action: 'cmd' },
+            { label: '🗑️ /clear            Clear Session', value: '/clear', action: 'cmd' },
+            { label: '❓ /help             All Commands', value: '/help', action: 'cmd' },
+            { label: '🚪 /exit             Exit TUI', value: '/exit', action: 'cmd' },
         ];
+
+        // Filter out separators when searching
+        const filter = paletteFilter.toLowerCase();
+        const filteredItems = filter
+            ? menuItems.filter(item => item.action !== 'noop' && item.label.toLowerCase().includes(filter))
+            : menuItems;
+
+        // Handle menu selection
+        const handleMenuSelect = (item) => {
+            if (item.action === 'noop') return; // Separator clicked
+
+            if (item.action === 'toggle') {
+                // Execute toggle immediately
+                switch (item.value) {
+                    case 'toggle_smartx':
+                        setSoloMode(prev => !prev);
+                        break;
+                    case 'toggle_auto':
+                        setAutoApprove(prev => !prev);
+                        break;
+                    case 'toggle_agents':
+                        setMultiAgentEnabled(prev => !prev);
+                        break;
+                    case 'toggle_context':
+                        setContextEnabled(prev => !prev);
+                        break;
+                    case 'toggle_thinking':
+                        setExposedThinking(prev => !prev);
+                        break;
+                    case 'toggle_debug':
+                        debugLogger.toggle();
+                        break;
+                }
+                // Don't close - allow multiple toggles
+                return;
+            }
+
+            if (item.action === 'cmd') {
+                // Execute command immediately
+                setShowCommandPalette(false);
+                setPaletteFilter('');
+                setInput(item.value);
+                // Trigger submit
+                setTimeout(() => {
+                    // Auto-submit the command
+                }, 50);
+                return;
+            }
+
+            if (item.action === 'input') {
+                // Put in input field for user to complete
+                setShowCommandPalette(false);
+                setPaletteFilter('');
+                setInput(item.value);
+                return;
+            }
+        };
 
         return h(Box, {
             flexDirection: 'column',
+            borderStyle: 'round',
+            borderColor: 'cyan',
             padding: 1,
-            width: Math.min(60, columns - 4),
-            height: rows
+            width: Math.min(45, columns - 4),
         },
             // Header
-            h(Text, { color: 'cyan', bold: true }, '⚙ Settings Menu (Ctrl+K)'),
-            h(Text, { color: 'gray', dimColor: true }, '─'.repeat(30)),
-
-            // SETTINGS SECTION with toggles
-            h(Box, { marginTop: 1, marginBottom: 1, flexDirection: 'column' },
-                h(Text, { color: 'yellow', bold: true }, 'SETTINGS'),
-                ...settingsSection.map((setting, i) =>
-                    h(Box, { key: i, marginTop: 0 },
-                        h(Text, { color: 'gray' }, `  ${setting.name}: `),
-                        setting.value
-                            ? h(Text, { color: 'green', bold: true }, '[ON] ')
-                            : h(Text, { color: 'gray', dimColor: true }, '[OFF]'),
-                        h(Text, { color: 'gray', dimColor: true },
-                            setting.value ? ` → ${setting.offCmd}` : ` → ${setting.onCmd}`)
-                    )
-                )
-            ),
-
-            h(Text, { color: 'gray', dimColor: true }, '─'.repeat(30)),
-
-            // COMMANDS SECTION
-            h(Box, { marginTop: 1, flexDirection: 'column' },
-                h(Text, { color: 'yellow', bold: true }, 'COMMANDS'),
-                h(Text, { color: 'gray' }, '  /agents     Agent Menu'),
-                h(Text, { color: 'gray' }, '  /plan       Planner Agent'),
-                h(Text, { color: 'cyan' }, '  /remember   Save to Memory'),
-                h(Text, { color: 'cyan' }, '  /memory     View Memory'),
-                h(Text, { color: 'cyan' }, '  /skills     List Skills'),
-                h(Text, { color: 'cyan' }, '  /skill      Use a Skill'),
-                h(Text, { color: 'cyan' }, '  /debug      Toggle Debug'),
-                h(Text, { color: 'gray' }, '  /paste      Clipboard Paste'),
-                h(Text, { color: 'gray' }, '  /project    Project Info'),
-                h(Text, { color: 'gray' }, '  /write      Write Files'),
-                h(Text, { color: 'gray' }, '  /clear      Clear Session'),
-                h(Text, { color: 'gray' }, '  /smartx     SmartX Engine On/Off'),
-                h(Text, { color: 'gray' }, '  /auto       Auto-Approve On/Off'),
-                h(Text, { color: 'gray' }, '  /help       All Commands'),
-                h(Text, { color: 'gray' }, '  /exit       Exit TUI')
-            ),
+            h(Text, { color: 'cyan', bold: true }, '⚙ Settings & Commands'),
+            h(Text, { color: 'gray', dimColor: true }, 'Use ↑↓ to navigate, Enter to select'),
 
             // Search input
-            h(Box, { marginTop: 1 },
-                h(Text, { color: 'gray' }, '> '),
+            h(Box, { marginTop: 1, marginBottom: 1 },
+                h(Text, { color: 'yellow' }, '🔍 '),
                 h(TextInput, {
                     value: paletteFilter,
                     onChange: setPaletteFilter,
-                    placeholder: 'Type command...'
+                    placeholder: 'Type to filter...'
                 })
             ),
 
-            // Filtered results (if searching)
-            filter && filteredCommands.length > 0
-                ? h(SelectInput, { items: filteredCommands, onSelect: handleCommandSelect })
-                : null,
+            // Menu items with SelectInput
+            h(Box, { flexDirection: 'column', height: Math.min(20, rows - 10) },
+                h(SelectInput, {
+                    items: filteredItems,
+                    onSelect: handleMenuSelect,
+                    itemComponent: ({ isSelected, label }) =>
+                        h(Text, {
+                            color: label.startsWith('─') ? 'gray' : (isSelected ? 'cyan' : 'white'),
+                            bold: isSelected,
+                            dimColor: label.startsWith('─')
+                        }, isSelected && !label.startsWith('─') ? `❯ ${label}` : `  ${label}`)
+                })
+            ),
 
             // Footer
             h(Box, { marginTop: 1 },
-                h(Text, { dimColor: true }, 'Esc to close')
+                h(Text, { dimColor: true }, 'Esc to close • Toggles update instantly')
             )
         );
     }
