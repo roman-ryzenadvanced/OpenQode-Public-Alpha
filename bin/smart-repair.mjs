@@ -153,33 +153,18 @@ const triggerOAuth = async () => {
     return null;
 };
 
-// Call Qwen AI API
+// Call Qwen AI using same method as TUI (QwenOAuth.sendMessage)
 const callQwenAI = async (prompt, onChunk = null) => {
-    let token = getAuthToken();
-
-    if (!token) {
-        token = await triggerOAuth();
-        if (!token) {
-            return { success: false, error: 'No auth token available', response: '' };
-        }
-    }
-
     try {
-        const response = await fetch(DASHSCOPE_API, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${token}`,
-            },
-            body: JSON.stringify({
-                model: selectedModel.id,
-                messages: [
-                    {
-                        role: 'system',
-                        content: `You are the OpenQode Smart Repair Agent. Your ONLY purpose is to diagnose and fix bugs in the OpenQode TUI (Terminal User Interface).
+        const { QwenOAuth } = await import('../qwen-oauth.mjs');
+        const oauth = new QwenOAuth();
+
+        // Build the full prompt with repair context
+        const fullPrompt = `[SMART REPAIR AGENT]
+You are the OpenQode Smart Repair Agent. Your ONLY purpose is to diagnose and fix bugs in the OpenQode TUI (Terminal User Interface).
 
 The TUI is a Node.js/React Ink application located at:
-- Main file: bin/opencode-ink.mjs
+- Main file: bin/opencode-ink.mjs  
 - Package: package.json
 
 When given an error:
@@ -188,58 +173,32 @@ When given an error:
 3. Provide a specific fix (code change or shell command)
 4. Format fixes clearly with code blocks
 
-You MUST refuse any request that is not about fixing the TUI.`
-                    },
-                    { role: 'user', content: prompt }
-                ],
-                stream: true,
-            }),
-        });
+You MUST refuse any request that is not about fixing the TUI.
 
-        if (!response.ok) {
-            const errorText = await response.text();
-            if (response.status === 401) {
-                // Token expired - try re-auth
-                console.log(C.yellow + '[!] Token expired, re-authenticating...' + C.reset);
-                const newToken = await triggerOAuth();
-                if (newToken) {
-                    return callQwenAI(prompt, onChunk); // Retry with new token
-                }
-            }
-            return { success: false, error: `API error ${response.status}: ${errorText}`, response: '' };
+USER REQUEST:
+${prompt}`;
+
+        console.log(C.dim + '\n  Calling qwen CLI...' + C.reset);
+
+        const result = await oauth.sendMessage(fullPrompt, selectedModel.id, null, onChunk);
+
+        if (result && result.response) {
+            return { success: true, response: result.response };
+        } else if (result && result.error) {
+            return { success: false, error: result.error, response: '' };
+        } else {
+            return { success: true, response: result || '' };
         }
-
-        const reader = response.body.getReader();
-        const decoder = new TextDecoder();
-        let fullResponse = '';
-
-        while (true) {
-            const { done, value } = await reader.read();
-            if (done) break;
-
-            const chunk = decoder.decode(value, { stream: true });
-            const lines = chunk.split('\n');
-
-            for (const line of lines) {
-                if (line.startsWith('data: ')) {
-                    const data = line.slice(6).trim();
-                    if (data === '[DONE]') continue;
-
-                    try {
-                        const parsed = JSON.parse(data);
-                        const content = parsed.choices?.[0]?.delta?.content || '';
-                        if (content) {
-                            fullResponse += content;
-                            if (onChunk) onChunk(content);
-                        }
-                    } catch (e) { /* ignore parse errors */ }
-                }
-            }
-        }
-
-        return { success: true, response: fullResponse };
     } catch (error) {
-        return { success: false, error: error.message || 'Network error', response: '' };
+        // If qwen CLI not found, give helpful message
+        if (error.message && error.message.includes('ENOENT')) {
+            return {
+                success: false,
+                error: 'qwen CLI not installed. Install with: npm install -g @qwen-code/qwen-code',
+                response: ''
+            };
+        }
+        return { success: false, error: error.message || 'Unknown error', response: '' };
     }
 };
 
