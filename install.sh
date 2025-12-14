@@ -144,9 +144,16 @@ else
     git clone "$REPO_URL" "$TARGET_DIR"
 fi
 
-# Step 4: Install dependencies
+# Step 4: Install dependencies (clean install to ensure React overrides work)
 cd "$TARGET_DIR"
 echo -e "${CYAN}[4/4] Installing dependencies...${NC}"
+
+# Clean existing node_modules to ensure React overrides take effect
+if [ -d "node_modules" ]; then
+    echo -e "${YELLOW}[*] Cleaning existing dependencies for fresh install...${NC}"
+    rm -rf node_modules package-lock.json
+fi
+
 npm install --legacy-peer-deps
 if [ $? -ne 0 ]; then
     echo -e "${YELLOW}[!] Retrying npm install...${NC}"
