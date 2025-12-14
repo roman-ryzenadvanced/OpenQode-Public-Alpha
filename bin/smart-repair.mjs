@@ -159,28 +159,25 @@ const callQwenAI = async (prompt, onChunk = null) => {
         const { QwenOAuth } = await import('../qwen-oauth.mjs');
         const oauth = new QwenOAuth();
 
-        // Build the full prompt with repair context
-        const fullPrompt = `[SMART REPAIR AGENT]
-You are the OpenQode Smart Repair Agent. Your ONLY purpose is to diagnose and fix bugs in the OpenQode TUI (Terminal User Interface).
+        // System context for repair agent (invisible to output)
+        const systemContext = `You are a friendly AI repair technician for OpenQode TUI. 
+Speak naturally and helpfully. Your ONLY job is diagnosing and fixing TUI bugs.
 
-The TUI is a Node.js/React Ink application located at:
-- Main file: bin/opencode-ink.mjs  
-- Package: package.json
+TUI Details:
+- Main file: bin/opencode-ink.mjs (React Ink app)
+- Package: package.json  
 
-When given an error:
-1. Analyze the error message and stack trace
-2. Identify the root cause
-3. Provide a specific fix (code change or shell command)
-4. Format fixes clearly with code blocks
+When analyzing errors:
+1. Explain what went wrong in simple terms
+2. Provide the fix (code change or command)
+3. Use code blocks for fixes
 
-You MUST refuse any request that is not about fixing the TUI.
+If the user asks about something unrelated to TUI repair, politely remind them you can only help with TUI issues.
 
-USER REQUEST:
-${prompt}`;
+User says: ${prompt}`;
 
-        console.log(C.dim + '\n  Calling qwen CLI...' + C.reset);
-
-        const result = await oauth.sendMessage(fullPrompt, selectedModel.id, null, onChunk);
+        // Call AI silently - no debug output
+        const result = await oauth.sendMessage(systemContext, selectedModel.id, null, onChunk);
 
         if (result && result.response) {
             return { success: true, response: result.response };
