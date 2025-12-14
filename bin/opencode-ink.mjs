@@ -50,6 +50,7 @@ import { getSessionMemory } from '../lib/session-memory.mjs';
 import { getContextManager } from '../lib/context-manager.mjs';
 import { getAllSkills, getSkill, executeSkill, getSkillListDisplay } from '../lib/skills.mjs';
 import { getDebugLogger, initFromArgs } from '../lib/debug-logger.mjs';
+import { processCommand, isCommand } from '../lib/command-processor.mjs';
 
 // Initialize debug logger from CLI args
 const debugLogger = initFromArgs();
