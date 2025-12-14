@@ -4012,6 +4012,17 @@ This gives the user a chance to refine requirements before implementation.
             autoApprove
                 ? { label: '/auto        Auto-Approve → OFF', value: '/auto' }
                 : { label: '/auto        Auto-Approve → ON', value: '/auto' },
+            // ═══════════════════════════════════════════════════════════════
+            // NEW FEATURES - Session Memory, Skills, Debug
+            // ═══════════════════════════════════════════════════════════════
+            { label: '/remember     Save to Memory', value: '/remember ' },
+            { label: '/memory       View Memory', value: '/memory' },
+            { label: '/forget       Remove Memory', value: '/forget ' },
+            { label: '/skills       List Skills', value: '/skills' },
+            { label: '/skill        Use a Skill', value: '/skill ' },
+            { label: '/debug        Toggle Debug', value: '/debug' },
+            { label: '/help         Show All Commands', value: '/help' },
+            // ═══════════════════════════════════════════════════════════════
             { label: '/paste        Clipboard Paste', value: '/paste' },
             { label: '/project      Project Info', value: '/project' },
             { label: '/write        Write Files', value: '/write' },
@@ -4097,12 +4108,18 @@ This gives the user a chance to refine requirements before implementation.
                 h(Text, { color: 'yellow', bold: true }, 'COMMANDS'),
                 h(Text, { color: 'gray' }, '  /agents     Agent Menu'),
                 h(Text, { color: 'gray' }, '  /plan       Planner Agent'),
+                h(Text, { color: 'cyan' }, '  /remember   Save to Memory'),
+                h(Text, { color: 'cyan' }, '  /memory     View Memory'),
+                h(Text, { color: 'cyan' }, '  /skills     List Skills'),
+                h(Text, { color: 'cyan' }, '  /skill      Use a Skill'),
+                h(Text, { color: 'cyan' }, '  /debug      Toggle Debug'),
                 h(Text, { color: 'gray' }, '  /paste      Clipboard Paste'),
                 h(Text, { color: 'gray' }, '  /project    Project Info'),
                 h(Text, { color: 'gray' }, '  /write      Write Files'),
                 h(Text, { color: 'gray' }, '  /clear      Clear Session'),
                 h(Text, { color: 'gray' }, '  /smartx     SmartX Engine On/Off'),
                 h(Text, { color: 'gray' }, '  /auto       Auto-Approve On/Off'),
+                h(Text, { color: 'gray' }, '  /help       All Commands'),
                 h(Text, { color: 'gray' }, '  /exit       Exit TUI')
             ),
 
