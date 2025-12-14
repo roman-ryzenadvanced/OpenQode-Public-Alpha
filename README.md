@@ -150,13 +150,20 @@ The redesigned settings panel gives you one-click access to all features with li
 ```
 
 ### 🎯 Skills Library (`/skills`, `/skill`)
-**NEW!** 10 pre-built AI skill prompts for common tasks:
-- `test` - Generate unit tests
-- `refactor` - Code refactoring suggestions
-- `review` - Thorough code review
-- `docs` - Generate documentation
-- `security` - Security audit
-- `explain` - Explain code in simple terms
+**NEW!** 24 pre-built AI skill prompts imported from [Anthropic's Official Skills](https://github.com/anthropics/skills):
+
+| Category | Skills |
+|----------|--------|
+| **Design** | `algorithmic-art`, `brand-guidelines`, `canvas-design`, `theme-factory`, `frontend-design` |
+| **Documents** | `pdf`, `docx`, `pptx`, `xlsx` |
+| **Development** | `mcp-builder`, `web-artifacts-builder`, `test`, `refactor`, `review`, `api`, `schema`, `explain` |
+| **Testing** | `webapp-testing` |
+| **Writing** | `doc-coauthoring`, `internal-comms` |
+| **Creative** | `slack-gif-creator`, `skill-creator` |
+| **Security** | `security` |
+| **Docs** | `docs` |
+
+Usage: `/skill pdf` then describe what you need!
 
 ### 🔧 Debug Logging (`/debug`)
 **NEW!** Toggle detailed API request/response logging for debugging:
