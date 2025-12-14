@@ -4182,39 +4182,25 @@ This gives the user a chance to refine requirements before implementation.
 
         // Create all menu items with proper grouping and actions
         const menuItems = [
-            // ═══════════════════════════════════════════════════════════════
-            // TOGGLES (direct action on select)
-            // ═══════════════════════════════════════════════════════════════
-            { label: `⚙ SmartX Engine      ${soloMode ? '🟢 ON' : '⚫ OFF'}`, value: 'toggle_smartx', action: 'toggle' },
-            { label: `⚙ Auto-Approve       ${autoApprove ? '🟢 ON' : '⚫ OFF'}`, value: 'toggle_auto', action: 'toggle' },
-            { label: `⚙ Multi-Agent        ${multiAgentEnabled ? '🟢 ON' : '⚫ OFF'}`, value: 'toggle_agents', action: 'toggle' },
-            { label: `⚙ Smart Context      ${contextEnabled ? '🟢 ON' : '⚫ OFF'}`, value: 'toggle_context', action: 'toggle' },
-            { label: `⚙ Exposed Thinking   ${exposedThinking ? '🟢 ON' : '⚫ OFF'}`, value: 'toggle_thinking', action: 'toggle' },
-            { label: `⚙ Debug Logging      ${debugLogger.enabled ? '🟢 ON' : '⚫ OFF'}`, value: 'toggle_debug', action: 'toggle' },
-            { label: '─────────────────────────────', value: 'sep1', action: 'noop' },
-            // ═══════════════════════════════════════════════════════════════
-            // MEMORY COMMANDS
-            // ═══════════════════════════════════════════════════════════════
-            { label: '📝 /remember        Save to Memory', value: '/remember ', action: 'input' },
-            { label: '📝 /memory          View Memory', value: '/memory', action: 'cmd' },
+            // TOGGLES - All 6 feature toggles
+            { label: `⚙️ SmartX Engine      ${soloMode ? '🟢 ON' : '⚫ OFF'}`, value: 'toggle_smartx', action: 'toggle' },
+            { label: `⚙️ Auto-Approve       ${autoApprove ? '🟢 ON' : '⚫ OFF'}`, value: 'toggle_auto', action: 'toggle' },
+            { label: `⚙️ Multi-Agent        ${multiAgentEnabled ? '🟢 ON' : '⚫ OFF'}`, value: 'toggle_agents', action: 'toggle' },
+            { label: `⚙️ Smart Context      ${contextEnabled ? '🟢 ON' : '⚫ OFF'}`, value: 'toggle_context', action: 'toggle' },
+            { label: `⚙️ Exposed Thinking   ${exposedThinking ? '🟢 ON' : '⚫ OFF'}`, value: 'toggle_thinking', action: 'toggle' },
+            { label: `⚙️ Debug Logging      ${debugLogger.enabled ? '🟢 ON' : '⚫ OFF'}`, value: 'toggle_debug', action: 'toggle' },
+            // MEMORY - 3 commands
+            { label: '📝 /remember         Save to Memory', value: '/remember ', action: 'input' },
+            { label: '📝 /memory           View Memory', value: '/memory', action: 'cmd' },
             { label: '📝 /forget           Remove Fact', value: '/forget ', action: 'input' },
-            { label: '─────────────────────────────', value: 'sep2', action: 'noop' },
-            // ═══════════════════════════════════════════════════════════════
-            // SKILLS
-            // ═══════════════════════════════════════════════════════════════
+            // SKILLS - 2 commands
             { label: '🎯 /skills           List Skills', value: '/skills', action: 'cmd' },
             { label: '🎯 /skill            Use a Skill', value: '/skill ', action: 'input' },
-            { label: '─────────────────────────────', value: 'sep3', action: 'noop' },
-            // ═══════════════════════════════════════════════════════════════
-            // AGENTS
-            // ═══════════════════════════════════════════════════════════════
+            // AGENTS - 3 commands
             { label: '🤖 /agents           Agent Menu', value: '/agents', action: 'cmd' },
             { label: '🤖 /plan             Planner Agent', value: '/plan', action: 'cmd' },
             { label: '🤖 /model            Change Model', value: '/model', action: 'cmd' },
-            { label: '─────────────────────────────', value: 'sep4', action: 'noop' },
-            // ═══════════════════════════════════════════════════════════════
-            // SESSION
-            // ═══════════════════════════════════════════════════════════════
+            // SESSION - 8 commands
             { label: '💾 /save             Save Session', value: '/save ', action: 'input' },
             { label: '📂 /load             Load Session', value: '/load ', action: 'input' },
             { label: '📋 /paste            Clipboard Paste', value: '/paste', action: 'cmd' },
