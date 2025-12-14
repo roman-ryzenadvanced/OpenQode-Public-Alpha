@@ -2351,7 +2351,9 @@ const App = () => {
 
         // ESC closes menus
         if (key.escape) {
-            if (showTodoOverlay) {
+            if (showSkillSelector) {
+                setShowSkillSelector(false);
+            } else if (showTodoOverlay) {
                 setShowTodoOverlay(false);
             } else if (showCommandPalette) {
                 setShowCommandPalette(false);
@@ -4176,12 +4178,7 @@ This gives the user a chance to refine requirements before implementation.
             }]);
         };
 
-        // Handle ESC to close
-        useInput((input, key) => {
-            if (key.escape) {
-                setShowSkillSelector(false);
-            }
-        }, { isActive: showSkillSelector });
+        // ESC handling is done in the main keyboard handler
 
         return h(Box, {
             flexDirection: 'column',
