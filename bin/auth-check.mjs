@@ -1,10 +1,8 @@
 #!/usr/bin/env node
 /**
  * OpenQode Auth Check
- * Verifies qwen CLI is authenticated by running a test command.
- * Called by launchers before showing menu.
- * 
- * This uses the same auth method as TUI (qwen CLI)
+ * Runs qwen auth if not authenticated. Shows URL for manual auth.
+ * Centralized auth for all tools (TUI, Smart Repair, etc.)
  */
 import { spawn } from 'child_process';
 import path from 'path';
@@ -26,51 +24,67 @@ const C = {
     dim: '\x1b[2m'
 };
 
-// Check if qwen CLI is installed and authenticated
-const checkQwenCLI = () => {
-    return new Promise((resolve) => {
-        const isWin = process.platform === 'win32';
-        let command = 'qwen';
-        let args = ['--version'];
-
-        // On Windows, try to find the CLI directly
-        if (isWin) {
-            const appData = process.env.APPDATA || '';
-            const cliPath = path.join(appData, 'npm', 'node_modules', '@qwen-code', 'qwen-code', 'cli.js');
-            if (fs.existsSync(cliPath)) {
-                command = 'node';
-                args = [cliPath, '--version'];
-            } else {
-                command = 'qwen.cmd';
-            }
+// Get qwen command for current platform
+const getQwenCommand = () => {
+    const isWin = process.platform === 'win32';
+    if (isWin) {
+        const appData = process.env.APPDATA || '';
+        const cliPath = path.join(appData, 'npm', 'node_modules', '@qwen-code', 'qwen-code', 'cli.js');
+        if (fs.existsSync(cliPath)) {
+            return { command: 'node', args: [cliPath] };
         }
+        return { command: 'qwen.cmd', args: [] };
+    }
+    return { command: 'qwen', args: [] };
+};
 
-        const child = spawn(command, args, {
-            shell: false,
-            timeout: 10000
+// Check if authenticated by running a quick test
+const checkAuth = () => {
+    return new Promise((resolve) => {
+        const { command, args } = getQwenCommand();
+        const child = spawn(command, [...args, '--version'], { shell: false, timeout: 5000 });
+
+        child.on('error', () => resolve({ installed: false }));
+        child.on('close', (code) => {
+            resolve({ installed: code === 0 });
         });
 
-        let output = '';
-        child.stdout?.on('data', (data) => { output += data.toString(); });
-        child.stderr?.on('data', (data) => { output += data.toString(); });
+        setTimeout(() => { child.kill(); resolve({ installed: false }); }, 5000);
+    });
+};
+
+// Run qwen auth and show output (including URLs)
+const runQwenAuth = () => {
+    return new Promise((resolve) => {
+        console.log(C.yellow + '\n  Starting Qwen authentication...' + C.reset);
+        console.log(C.dim + '  This will open your browser for login.' + C.reset);
+        console.log(C.dim + '  If browser doesn\'t open, copy the URL shown below.' + C.reset);
+        console.log('');
+
+        const { command, args } = getQwenCommand();
+        const child = spawn(command, [...args, 'auth'], {
+            shell: false,
+            stdio: 'inherit'  // Show all output directly to user (includes URL)
+        });
 
         child.on('error', (err) => {
-            resolve({ installed: false, error: err.message });
+            console.log(C.red + `\n  Error: ${err.message}` + C.reset);
+            console.log('');
+            console.log(C.yellow + '  To install qwen CLI:' + C.reset);
+            console.log(C.cyan + '     npm install -g @qwen-code/qwen-code' + C.reset);
+            resolve(false);
         });
 
         child.on('close', (code) => {
-            if (code === 0 || output.includes('qwen')) {
-                resolve({ installed: true, version: output.trim() });
+            if (code === 0) {
+                console.log(C.green + '\n  ✅ Authentication successful!' + C.reset);
+                resolve(true);
             } else {
-                resolve({ installed: false, error: `Exit code: ${code}` });
+                console.log(C.yellow + '\n  Authentication may not have completed.' + C.reset);
+                console.log(C.dim + '  You can try again later with: qwen auth' + C.reset);
+                resolve(false);
             }
         });
-
-        // Timeout fallback
-        setTimeout(() => {
-            child.kill();
-            resolve({ installed: false, error: 'Timeout' });
-        }, 5000);
     });
 };
 
@@ -83,28 +97,60 @@ const main = async () => {
     console.log('');
     console.log(C.dim + '  Checking qwen CLI...' + C.reset);
 
-    const result = await checkQwenCLI();
+    const result = await checkAuth();
 
-    if (result.installed) {
-        console.log(C.green + '  ✅ qwen CLI is installed and ready!' + C.reset);
-        if (result.version) {
-            console.log(C.dim + `     ${result.version}` + C.reset);
-        }
+    if (!result.installed) {
+        console.log(C.yellow + '\n  ⚠️  qwen CLI not found.' + C.reset);
         console.log('');
-        console.log(C.dim + '  If you need to authenticate, run: qwen auth' + C.reset);
-        process.exit(0);
-    } else {
-        console.log(C.yellow + '  ⚠️  qwen CLI not found or not working.' + C.reset);
-        console.log('');
-        console.log(C.yellow + '  To install qwen CLI:' + C.reset);
+        console.log(C.yellow + '  To install:' + C.reset);
         console.log(C.cyan + '     npm install -g @qwen-code/qwen-code' + C.reset);
         console.log('');
-        console.log(C.yellow + '  After install, authenticate with:' + C.reset);
+        console.log(C.yellow + '  Then authenticate:' + C.reset);
         console.log(C.cyan + '     qwen auth' + C.reset);
         console.log('');
-        console.log(C.dim + '  You can still use OpenQode, but AI features require qwen CLI.' + C.reset);
         process.exit(1);
     }
+
+    console.log(C.green + '  ✅ qwen CLI is installed!' + C.reset);
+
+    // Check for existing tokens
+    const tokenPaths = [
+        path.join(process.env.HOME || process.env.USERPROFILE || '', '.qwen', 'auth.json'),
+        path.join(process.env.HOME || process.env.USERPROFILE || '', '.qwen', 'config.json'),
+        path.join(__dirname, '..', '.qwen-tokens.json'),
+        path.join(__dirname, '..', 'tokens.json'),
+    ];
+
+    let hasToken = false;
+    for (const tokenPath of tokenPaths) {
+        try {
+            if (fs.existsSync(tokenPath)) {
+                const data = JSON.parse(fs.readFileSync(tokenPath, 'utf8'));
+                if (data.access_token || data.token || data.api_key) {
+                    hasToken = true;
+                    console.log(C.green + '  ✅ Found authentication token!' + C.reset);
+                    break;
+                }
+            }
+        } catch (e) { /* ignore */ }
+    }
+
+    if (!hasToken) {
+        console.log(C.yellow + '\n  No authentication token found.' + C.reset);
+        console.log(C.dim + '  Running qwen auth to authenticate...' + C.reset);
+
+        const success = await runQwenAuth();
+        if (!success) {
+            console.log('');
+            console.log(C.yellow + '  You can use OpenQode, but AI features require authentication.' + C.reset);
+            console.log(C.dim + '  Run "qwen auth" anytime to authenticate.' + C.reset);
+        }
+    } else {
+        console.log(C.dim + '  Ready to use OpenQode!' + C.reset);
+    }
+
+    console.log('');
+    process.exit(0);
 };
 
 main().catch(e => {
