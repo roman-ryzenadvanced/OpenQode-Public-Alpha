@@ -93,6 +93,34 @@ System-level autonomous execution. An extension of SmartX that grants the AI per
 
 ---
 
+## 🔧 Smart Repair Agent v2.0
+
+When your TUI crashes or encounters errors, **Smart Repair** is an AI-powered self-healing system that diagnoses and fixes issues automatically.
+
+![Smart Repair Agent](assets/smart-repair.png)
+
+### What It Does:
+- **Analyze Errors** - Paste any crash/error message
+- **AI Diagnosis** - Identifies root cause using Qwen AI models
+- **Auto-Fix** - Runs repair commands (`npm install`, `git pull`, etc.)
+- **Verify** - Checks if the fix was successful
+
+### How to Access:
+
+| Platform | Menu Option |
+|----------|-------------|
+| **Windows** | `OpenQode.bat` → Option **9** |
+| **Linux/Mac** | `./OpenQode.sh` → Option **7** |
+| **Direct** | `node bin/smart-repair.mjs` |
+
+### Commands Inside Smart Repair:
+- **Paste error** → AI analyzes and suggests fix
+- **`model`** → Switch AI model (Coder Plus, Plus, Turbo)
+- **`auth`** → Trigger Qwen authentication
+- **`quit`** → Exit
+
+---
+
 ## ⚡ Feature: Zero-Config Authentication
 OpenQode attempts to use your existing Qwen CLI authentication. 
 - Using standard **Option 5**, simply follow the prompts.
