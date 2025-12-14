@@ -20,6 +20,11 @@ if [ ! -d "node_modules" ]; then
     echo ""
 fi
 
+# Check Qwen authentication
+echo "[INFO] Checking Qwen authentication..."
+node bin/auth-check.mjs
+echo ""
+
 # Functions
 pause() {
     read -p "Press Enter to continue..."

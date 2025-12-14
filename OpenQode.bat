@@ -22,6 +22,11 @@ if not exist "node_modules" (
     echo.
 )
 
+REM --- Auth Check ---
+echo [INFO] Checking Qwen authentication...
+node bin\auth-check.mjs
+echo.
+
 :menu
 cls
 echo ========================================
