@@ -2628,7 +2628,14 @@ const App = () => {
                     return;
                 }
 
-                case '/skills':
+                case '/skills': {
+                    // Show skill list in chat
+                    const display = getSkillListDisplay();
+                    setMessages(prev => [...prev, { role: 'system', content: `🎯 **Available Skills (24)**\n${display}\nUse /skill to open the selector, or /skill <name> to activate directly.` }]);
+                    setInput('');
+                    return;
+                }
+
                 case '/skill': {
                     if (!arg) {
                         // Open skill selector
@@ -2642,7 +2649,7 @@ const App = () => {
                     if (!skill) {
                         const skills = getAllSkills();
                         const names = skills.map(s => s.id).join(', ');
-                        setMessages(prev => [...prev, { role: 'system', content: `❌ Unknown skill: "${skillName}"\nAvailable: ${names}\n\nUse /skills to see the full list.` }]);
+                        setMessages(prev => [...prev, { role: 'system', content: `❌ Unknown skill: "${skillName}"\nAvailable: ${names}\n\nUse /skill to open the selector.` }]);
                     } else {
                         // Inject skill prompt into system for next message
                         setActiveSkill(skill);
