@@ -3950,11 +3950,7 @@ This gives the user a chance to refine requirements before implementation.
             { label: '/plan         Planner Agent', value: '/plan' },
             { label: '/context      Toggle Context', value: '/context' },
             { label: '/thinking     Toggle Thinking', value: '/thinking' },
-            { label: '/paste        Clipboard Paste', value: '/paste' },
-            { label: '/project      Project Info', value: '/project' },
-            { label: '/write        Write Files', value: '/write' },
-            { label: '/clear        Clear Session', value: '/clear' },
-            // SmartX Engine toggle
+            // SmartX Engine toggle - high visibility
             soloMode
                 ? { label: '/smartx off  SmartX → OFF', value: '/smartx off' }
                 : { label: '/smartx on   SmartX → ON', value: '/smartx on' },
@@ -3962,6 +3958,10 @@ This gives the user a chance to refine requirements before implementation.
             autoApprove
                 ? { label: '/auto        Auto-Approve → OFF', value: '/auto' }
                 : { label: '/auto        Auto-Approve → ON', value: '/auto' },
+            { label: '/paste        Clipboard Paste', value: '/paste' },
+            { label: '/project      Project Info', value: '/project' },
+            { label: '/write        Write Files', value: '/write' },
+            { label: '/clear        Clear Session', value: '/clear' },
             { label: '/exit         Exit TUI', value: '/exit' }
         ];
 
