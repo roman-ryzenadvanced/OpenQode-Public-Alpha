@@ -58,11 +58,34 @@ We recommend starting with **Next-Gen (Option 5)**!
 | **Visuals** | **Animated Borders**, RGB Pulse, Spinners | Static Text |
 | **Interactivity**| **Interactive Menus** (Arrow Keys Selection) | Command-based only |
 | **Computer Use** | **Command Execution** (Runs shell cmds) | Read-only |
+| **SOLO Mode** | **Autonomous Operation** (Auto-heal, auto-execute) | N/A |
+| **Auto-Approve** | **AutoRun Commands** without Y/N prompts | N/A |
 | **Projects** | **Any Absolute Path** (e.g. E:\MyProject) | Subfolders Only |
 | **Models** | **Visual Model Selector** (`/model`) | Manual Switch via CLI |
 | **Thinking** | **Real-time Stats** (CPS, Tokens) | Basic Loading |
 
 ![Context and Stats](assets/screenshots/next-gen-2.png)
+
+---
+
+## 🤖 SOLO Mode & Auto-Approve
+
+OpenQode Gen 5 introduces powerful automation features for hands-free coding:
+
+![Features Panel](assets/features-panel.png)
+
+### 🚀 SOLO Mode
+When enabled, the AI operates autonomously - executing commands, writing files, and fixing errors without constant prompts.
+- Toggle via `/solo on` or `/solo off`
+- Visible in sidebar: `SOLO: ON` (magenta)
+
+### ⚡ Auto-Approve (AutoRun)
+Automatically approve and execute AI-suggested commands without Y/N confirmation.
+- Toggle via `/auto`
+- Visible in sidebar: `AutoRun: ON` (yellow)
+- **Best used with SOLO mode** for fully autonomous operation
+
+> 💡 **Tip:** Press `ESC` at any time to abort a running command!
 
 ---
 
