@@ -43,6 +43,17 @@ import ThinkingBlock from './ui/components/ThinkingBlock.mjs';
 import ChatBubble from './ui/components/ChatBubble.mjs';
 import TodoList from './ui/components/TodoList.mjs';
 
+// ═══════════════════════════════════════════════════════════════
+// NEW FEATURE MODULES - Inspired by Mini-Agent, original implementation
+// ═══════════════════════════════════════════════════════════════
+import { getSessionMemory } from '../lib/session-memory.mjs';
+import { getContextManager } from '../lib/context-manager.mjs';
+import { getAllSkills, getSkill, executeSkill, getSkillListDisplay } from '../lib/skills.mjs';
+import { getDebugLogger, initFromArgs } from '../lib/debug-logger.mjs';
+
+// Initialize debug logger from CLI args
+const debugLogger = initFromArgs();
+
 const { useState, useCallback, useEffect, useRef, useMemo } = React;
 
 // Custom hook for terminal dimensions (replaces ink-use-stdout-dimensions)
@@ -1051,8 +1062,8 @@ const SmoothCounter = ({ value }) => {
 };
 
 // Component: EnhancedTypewriterText - Improved text reveal with batching and adaptive speed
-const EnhancedTypewriterText = ({ 
-    children, 
+const EnhancedTypewriterText = ({
+    children,
     speed = 25,
     batchSize = 1  // Default to 1 for safety, can be increased for batching
 }) => {
@@ -1084,10 +1095,10 @@ const EnhancedTypewriterText = ({
             // Calculate batch size (may be smaller near the end)
             const remaining = fullText.length - positionRef.current;
             const currentBatchSize = Math.min(batchSize, remaining);
-            
+
             // Get the next batch of characters
             const nextBatch = fullText.substring(positionRef.current, positionRef.current + currentBatchSize);
-            
+
             // Update display and position
             setDisplayText(prev => prev + nextBatch);
             positionRef.current += currentBatchSize;
@@ -3362,106 +3373,106 @@ This gives the user a chance to refine requirements before implementation.
             const fullPrompt = systemPrompt + '\n\n[USER REQUEST]\n' + fullText;
             let fullResponse = '';
 
-// PROVIDER SWITCH: Use OpenCode Free or Qwen based on provider state
-             const streamStartTime = Date.now(); // Track start time for this request
-             let totalCharsReceived = 0; // Track total characters for speed calculation
-             
-             const result = provider === 'opencode-free'
-                 ? await callOpenCodeFree(fullPrompt, freeModel, (chunk) => {
-                     const cleanChunk = chunk.replace(/[\u001b\u009b][[\]()#;?]*(?:[0-9]{1,4}(?:;[0-9]{0,4})*)?[0-9A-ORZcf-nqry=><]/g, '');
+            // PROVIDER SWITCH: Use OpenCode Free or Qwen based on provider state
+            const streamStartTime = Date.now(); // Track start time for this request
+            let totalCharsReceived = 0; // Track total characters for speed calculation
 
-                     // IMPROVED STREAM SPLITTING LOGIC (Thinking vs Content)
-                     // Claude Code style: cleaner separation of thinking from response
-                     const lines = cleanChunk.split('\n');
-                     let isThinkingChunk = false;
+            const result = provider === 'opencode-free'
+                ? await callOpenCodeFree(fullPrompt, freeModel, (chunk) => {
+                    const cleanChunk = chunk.replace(/[\u001b\u009b][[\]()#;?]*(?:[0-9]{1,4}(?:;[0-9]{0,4})*)?[0-9A-ORZcf-nqry=><]/g, '');
 
-                     // Enhanced heuristics for better Claude-like thinking detection
-                     const trimmedChunk = cleanChunk.trim();
-                     if (/^(Let me|Now let me|I'll|I need to|I should|I notice|I can|I will|Thinking:|Analyzing|Considering|Checking|Looking|Planning|First|Next|Finally)/i.test(trimmedChunk)) {
-                         isThinkingChunk = true;
-                     } else if (/^```|# |Here is|```|```|```/i.test(trimmedChunk)) {
-                         // If we encounter code blocks or headers, likely content not thinking
-                         isThinkingChunk = false;
-                     }
+                    // IMPROVED STREAM SPLITTING LOGIC (Thinking vs Content)
+                    // Claude Code style: cleaner separation of thinking from response
+                    const lines = cleanChunk.split('\n');
+                    let isThinkingChunk = false;
 
-                     // Update character count for speed calculation
-                     totalCharsReceived += cleanChunk.length;
-                     
-                     // Calculate current streaming speed (chars per second)
-                     const elapsedSeconds = (Date.now() - streamStartTime) / 1000;
-                     const speed = elapsedSeconds > 0 ? Math.round(totalCharsReceived / elapsedSeconds) : 0;
+                    // Enhanced heuristics for better Claude-like thinking detection
+                    const trimmedChunk = cleanChunk.trim();
+                    if (/^(Let me|Now let me|I'll|I need to|I should|I notice|I can|I will|Thinking:|Analyzing|Considering|Checking|Looking|Planning|First|Next|Finally)/i.test(trimmedChunk)) {
+                        isThinkingChunk = true;
+                    } else if (/^```|# |Here is|```|```|```/i.test(trimmedChunk)) {
+                        // If we encounter code blocks or headers, likely content not thinking
+                        isThinkingChunk = false;
+                    }
 
-                     // GLOBAL STATS UPDATE (Run for ALL chunks)
-                     setThinkingStats(prev => ({ 
-                         ...prev, 
-                         chars: totalCharsReceived,
-                         speed: speed
-                     }));
+                    // Update character count for speed calculation
+                    totalCharsReceived += cleanChunk.length;
 
-                     // GLOBAL AGENT DETECTION (Run for ALL chunks)
-                     const agentMatch = cleanChunk.match(/\[AGENT:\s*([^\]]+)\]/i);
-                     if (agentMatch) {
-                         setThinkingStats(prev => ({ ...prev, activeAgent: agentMatch[1].trim() }));
-                     }
+                    // Calculate current streaming speed (chars per second)
+                    const elapsedSeconds = (Date.now() - streamStartTime) / 1000;
+                    const speed = elapsedSeconds > 0 ? Math.round(totalCharsReceived / elapsedSeconds) : 0;
 
-                     if (isThinkingChunk) {
-                         setThinkingLines(prev => [...prev, ...lines.map(l => l.trim()).filter(l => l && !/^(Let me|Now let me|I'll|I need to|I notice)/i.test(l.trim()))]);
-                     } else {
-                         setMessages(prev => {
-                             const last = prev[prev.length - 1];
-                             if (last && last.role === 'assistant') {
-                                 return [...prev.slice(0, -1), { ...last, content: last.content + cleanChunk }];
-                             }
-                             return prev;
-                         });
-                     }
-                 })
-: await getQwen().sendMessage(fullPrompt, 'qwen-coder-plus', null, (chunk) => {
-                     const cleanChunk = chunk.replace(/[\u001b\u009b][[\]()#;?]*(?:[0-9]{1,4}(?:;[0-9]{0,4})*)?[0-9A-ORZcf-nqry=><]/g, '');
+                    // GLOBAL STATS UPDATE (Run for ALL chunks)
+                    setThinkingStats(prev => ({
+                        ...prev,
+                        chars: totalCharsReceived,
+                        speed: speed
+                    }));
 
-                     // IMPROVED STREAM SPLITTING LOGIC (Thinking vs Content)
-                     const lines = cleanChunk.split('\n');
-                     let isThinkingChunk = false;
+                    // GLOBAL AGENT DETECTION (Run for ALL chunks)
+                    const agentMatch = cleanChunk.match(/\[AGENT:\s*([^\]]+)\]/i);
+                    if (agentMatch) {
+                        setThinkingStats(prev => ({ ...prev, activeAgent: agentMatch[1].trim() }));
+                    }
 
-                     // Enhanced heuristics for better Claude-like thinking detection
-                     const trimmedChunk = cleanChunk.trim();
-                     if (/^(Let me|Now let me|I'll|I need to|I should|I notice|I can|I will|Thinking:|Analyzing|Considering|Checking|Looking|Planning|First|Next|Finally)/i.test(trimmedChunk)) {
-                         isThinkingChunk = true;
-                     } else if (/^```|# |Here is|```|```|```/i.test(trimmedChunk)) {
-                         // If we encounter code blocks or headers, likely content not thinking
-                         isThinkingChunk = false;
-                     }
+                    if (isThinkingChunk) {
+                        setThinkingLines(prev => [...prev, ...lines.map(l => l.trim()).filter(l => l && !/^(Let me|Now let me|I'll|I need to|I notice)/i.test(l.trim()))]);
+                    } else {
+                        setMessages(prev => {
+                            const last = prev[prev.length - 1];
+                            if (last && last.role === 'assistant') {
+                                return [...prev.slice(0, -1), { ...last, content: last.content + cleanChunk }];
+                            }
+                            return prev;
+                        });
+                    }
+                })
+                : await getQwen().sendMessage(fullPrompt, 'qwen-coder-plus', null, (chunk) => {
+                    const cleanChunk = chunk.replace(/[\u001b\u009b][[\]()#;?]*(?:[0-9]{1,4}(?:;[0-9]{0,4})*)?[0-9A-ORZcf-nqry=><]/g, '');
 
-                     // Update character count for speed calculation (using same variable as OpenCode path)
-                     totalCharsReceived += cleanChunk.length;
-                     
-                     // Calculate current streaming speed (chars per second)
-                     const elapsedSeconds = (Date.now() - streamStartTime) / 1000;
-                     const speed = elapsedSeconds > 0 ? Math.round(totalCharsReceived / elapsedSeconds) : 0;
+                    // IMPROVED STREAM SPLITTING LOGIC (Thinking vs Content)
+                    const lines = cleanChunk.split('\n');
+                    let isThinkingChunk = false;
 
-                     setThinkingStats(prev => ({ 
-                         ...prev, 
-                         chars: totalCharsReceived,
-                         speed: speed
-                     }));
+                    // Enhanced heuristics for better Claude-like thinking detection
+                    const trimmedChunk = cleanChunk.trim();
+                    if (/^(Let me|Now let me|I'll|I need to|I should|I notice|I can|I will|Thinking:|Analyzing|Considering|Checking|Looking|Planning|First|Next|Finally)/i.test(trimmedChunk)) {
+                        isThinkingChunk = true;
+                    } else if (/^```|# |Here is|```|```|```/i.test(trimmedChunk)) {
+                        // If we encounter code blocks or headers, likely content not thinking
+                        isThinkingChunk = false;
+                    }
 
-                     const agentMatch = cleanChunk.match(/\[AGENT:\s*([^\]]+)\]/i);
-                     if (agentMatch) {
-                         setThinkingStats(prev => ({ ...prev, activeAgent: agentMatch[1].trim() }));
-                     }
+                    // Update character count for speed calculation (using same variable as OpenCode path)
+                    totalCharsReceived += cleanChunk.length;
 
-                     if (isThinkingChunk) {
-                         setThinkingLines(prev => [...prev, ...lines.map(l => l.trim()).filter(l => l && !/^(Let me|Now let me|I'll|I need to|I notice)/i.test(l.trim()))]);
-                     } else {
-                         setMessages(prev => {
-                             const last = prev[prev.length - 1];
-                             if (last && last.role === 'assistant') {
-                                 return [...prev.slice(0, -1), { ...last, content: last.content + cleanChunk }];
-                             }
-                             return prev;
-                         });
-                     }
-                 });
+                    // Calculate current streaming speed (chars per second)
+                    const elapsedSeconds = (Date.now() - streamStartTime) / 1000;
+                    const speed = elapsedSeconds > 0 ? Math.round(totalCharsReceived / elapsedSeconds) : 0;
+
+                    setThinkingStats(prev => ({
+                        ...prev,
+                        chars: totalCharsReceived,
+                        speed: speed
+                    }));
+
+                    const agentMatch = cleanChunk.match(/\[AGENT:\s*([^\]]+)\]/i);
+                    if (agentMatch) {
+                        setThinkingStats(prev => ({ ...prev, activeAgent: agentMatch[1].trim() }));
+                    }
+
+                    if (isThinkingChunk) {
+                        setThinkingLines(prev => [...prev, ...lines.map(l => l.trim()).filter(l => l && !/^(Let me|Now let me|I'll|I need to|I notice)/i.test(l.trim()))]);
+                    } else {
+                        setMessages(prev => {
+                            const last = prev[prev.length - 1];
+                            if (last && last.role === 'assistant') {
+                                return [...prev.slice(0, -1), { ...last, content: last.content + cleanChunk }];
+                            }
+                            return prev;
+                        });
+                    }
+                });
 
             if (result.success) {
                 const responseText = result.response || fullResponse;
