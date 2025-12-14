@@ -4047,7 +4047,7 @@ This gives the user a chance to refine requirements before implementation.
                 h(Text, { color: 'gray' }, '  /project    Project Info'),
                 h(Text, { color: 'gray' }, '  /write      Write Files'),
                 h(Text, { color: 'gray' }, '  /clear      Clear Session'),
-                h(Text, { color: 'gray' }, '  /solo       SmartX Engine On/Off'),
+                h(Text, { color: 'gray' }, '  /smartx     SmartX Engine On/Off'),
                 h(Text, { color: 'gray' }, '  /auto       Auto-Approve On/Off'),
                 h(Text, { color: 'gray' }, '  /exit       Exit TUI')
             ),
