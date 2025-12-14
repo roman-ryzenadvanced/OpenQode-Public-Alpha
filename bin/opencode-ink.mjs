@@ -61,6 +61,15 @@ import {
     formatFileOperation,
     separator
 } from '../lib/agent-prompt.mjs';
+import {
+    formatCodeBox,
+    formatFileDelivery,
+    formatPath,
+    truncateHeight,
+    formatTodoItem,
+    formatTaskChecklist,
+    getToolProgress
+} from '../lib/message-renderer.mjs';
 
 // Initialize debug logger from CLI args
 const debugLogger = initFromArgs();
