@@ -36,9 +36,10 @@ echo   [5] ★ NEXT-GEN TUI (Gen 5) - Recommended!
 echo   [6] Agent Manager
 echo   [7] Web Assist Dashboard
 echo   [8] Web IDE (Alpha)
-echo   [9] Exit
+echo   [9] 🔧 Smart Repair (Fix TUI crashes)
+echo   [0] Exit
 echo.
-set /p choice="Enter choice (1-9): "
+set /p choice="Enter choice (0-9): "
 
 if "%choice%"=="1" goto webgui
 if "%choice%"=="2" goto qwentui
@@ -48,7 +49,8 @@ if "%choice%"=="5" goto inktui
 if "%choice%"=="6" goto agentmgr
 if "%choice%"=="7" goto webassist
 if "%choice%"=="8" goto webide
-if "%choice%"=="9" goto exitapp
+if "%choice%"=="9" goto smartrepair
+if "%choice%"=="0" goto exitapp
 goto menu
 
 :webgui
@@ -108,6 +110,13 @@ goto menu
 
 :webide
 start "" "http://127.0.0.1:15044/"
+goto menu
+
+:smartrepair
+echo.
+echo Starting Smart Repair Agent...
+echo.
+node bin\smart-repair.mjs
 goto menu
 
 :exitapp

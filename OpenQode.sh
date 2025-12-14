@@ -66,7 +66,8 @@ while true; do
     echo "  [4] TUI Classic (Gen 4)"
     echo "  [5] ★ NEXT-GEN TUI (Gen 5) - Recommended!"
     echo "  [6] Agent Manager"
-    echo "  [7] Exit"
+    echo "  [7] 🔧 Smart Repair (Fix TUI crashes)"
+    echo "  [8] Exit"
     echo ""
     read -p "Enter choice: " choice
 
@@ -77,7 +78,8 @@ while true; do
         4) start_nodetui ;;
         5) start_inktui ;;
         6) echo "Use Windows version for Agent Manager (or edit files manually)"; pause ;;
-        7) exit 0 ;;
+        7) echo "Starting Smart Repair..."; node bin/smart-repair.mjs ;;
+        8) exit 0 ;;
         *) echo "Invalid choice"; pause ;;
     esac
 done
