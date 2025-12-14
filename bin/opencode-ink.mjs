@@ -1647,7 +1647,8 @@ const flattenMessagesToBlocks = (messages) => {
                 blockCount++;
             } else if (part.match(/^\[AGENT:/)) {
                 // AGENT TAG BLOCK (New)
-                const agentName = part.match(/\[AGENT:\s*([^\]]+)\]/)[1];
+                const agentMatch = part.match(/\[AGENT:\s*([^\]]+)\]/);
+                const agentName = agentMatch ? agentMatch[1] : 'Unknown';
                 blocks.push({
                     role: 'assistant',
                     type: 'agent_tag',
