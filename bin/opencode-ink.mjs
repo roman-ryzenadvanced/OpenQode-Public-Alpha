@@ -1167,7 +1167,9 @@ const Sidebar = ({
     selectedFiles,
     systemStatus,
     thinkingStats, // RECEIVED: { chars, activeAgent }
-    activeModel    // NEW: { name, id, isFree } - current AI model
+    activeModel,    // NEW: { name, id, isFree } - current AI model
+    soloMode = false,
+    autoApprove = false
 }) => {
     if (width === 0) return null;
 
@@ -1297,6 +1299,18 @@ const Sidebar = ({
                      h(Text, { color: 'gray' }, 'Think:  '),
                      exposedThinking
                          ? h(Text, { color: 'green', bold: true }, 'ON')
+                         : h(Text, { color: 'gray', dimColor: true }, 'OFF')
+                 ),
+                 h(Box, {},
+                     h(Text, { color: 'gray' }, 'SOLO:   '),
+                     soloMode
+                         ? h(Text, { color: 'magenta', bold: true }, 'ON')
+                         : h(Text, { color: 'gray', dimColor: true }, 'OFF')
+                 ),
+                 h(Box, {},
+                     h(Text, { color: 'gray' }, 'AutoRun:'),
+                     autoApprove
+                         ? h(Text, { color: 'yellow', bold: true }, 'ON')
                          : h(Text, { color: 'gray', dimColor: true }, 'OFF')
                  ),
                  h(Text, {}, ''),
@@ -2254,6 +2268,14 @@ const App = () => {
     const [lastCheckpointText, setLastCheckpointText] = useState('');
     // SOLO MODE STATE
     const [soloMode, setSoloMode] = useState(false);
+    const [autoApprove, setAutoApprove] = useState(false); // Auto-execute commands in SOLO mode
+
+    // AUTO-APPROVE: Automatically execute commands in SOLO mode
+    useEffect(() => {
+        if (autoApprove && soloMode && detectedCommands.length > 0 && !isExecutingCommands) {
+            handleExecuteCommands(true);
+        }
+    }, [autoApprove, soloMode, detectedCommands, isExecutingCommands]);
 
     // RESPONSIVE: Compute layout mode based on terminal size
     const layoutMode = computeLayoutMode(columns, rows);
@@ -2860,6 +2882,14 @@ const App = () => {
                 // ═══════════════════════════════════════════════════════
                 // POWER FEATURES COMMANDS
                 // ═══════════════════════════════════════════════════════
+                                case '/auto':
+                    setAutoApprove(prev => !prev);
+                    setMessages(prev => [...prev, { 
+                        role: 'system', 
+                        content: !autoApprove ? '▶️ Auto-Approve **ENABLED** - Commands execute automatically in SOLO mode' : '⏸ Auto-Approve **DISABLED** - Commands require confirmation' 
+                    }]);
+                    setInput('');
+                    return;
                 case '/theme':
                     if (arg && THEMES[arg.toLowerCase()]) {
                         setTheme(arg.toLowerCase());
@@ -3923,6 +3953,14 @@ This gives the user a chance to refine requirements before implementation.
             { label: '/project      Project Info', value: '/project' },
             { label: '/write        Write Files', value: '/write' },
             { label: '/clear        Clear Session', value: '/clear' },
+                        // SOLO Mode toggle
+            soloMode
+                ? { label: '/solo off    SOLO Mode → OFF', value: '/solo off' }
+                : { label: '/solo on     SOLO Mode → ON', value: '/solo on' },
+            // Auto-Approve toggle
+            autoApprove
+                ? { label: '/auto        Auto-Approve → OFF', value: '/auto' }
+                : { label: '/auto        Auto-Approve → ON', value: '/auto' },
             { label: '/exit         Exit TUI', value: '/exit' }
         ];
 
@@ -3957,6 +3995,18 @@ This gives the user a chance to refine requirements before implementation.
                 value: exposedThinking,
                 onCmd: '/thinking on',
                 offCmd: '/thinking off'
+            },
+            {
+                name: 'SOLO Mode',
+                value: soloMode,
+                onCmd: '/solo on',
+                offCmd: '/solo off'
+            },
+            {
+                name: 'Auto-Approve',
+                value: autoApprove,
+                onCmd: '/auto',
+                offCmd: '/auto'
             }
         ];
 
@@ -3996,6 +4046,8 @@ This gives the user a chance to refine requirements before implementation.
                 h(Text, { color: 'gray' }, '  /project    Project Info'),
                 h(Text, { color: 'gray' }, '  /write      Write Files'),
                 h(Text, { color: 'gray' }, '  /clear      Clear Session'),
+                                h(Text, { color: 'gray' }, '  /solo       SOLO Mode On/Off'),
+                h(Text, { color: 'gray' }, '  /auto       Auto-Approve On/Off'),
                 h(Text, { color: 'gray' }, '  /exit       Exit TUI')
             ),
 
@@ -4253,6 +4305,8 @@ This gives the user a chance to refine requirements before implementation.
             selectedFiles: selectedFiles,
             systemStatus: systemStatus,
             thinkingStats: thinkingStats, // PASS REAL-TIME STATS
+            soloMode: soloMode,
+            autoApprove: autoApprove,
             activeModel: (() => {
                 // Compute active model info for sidebar display
                 const modelId = provider === 'opencode-free' ? freeModel : 'qwen-coder-plus';
