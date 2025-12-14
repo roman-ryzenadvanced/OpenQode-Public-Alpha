@@ -1580,18 +1580,13 @@ const AgentCard = ({ content, isStreaming, width }) => {
             flexGrow: 1,
             minWidth: 10
         },
-            // Content with professional streaming
+            // Content with professional streaming - use stable DEFAULT_CONTENT_TYPES
             h(Box, { width: contentWidth },
                 isStreaming
                     ? h(ProfessionalTypewriter, {
                         children: content || '',
-                        baseSpeed: 20,
-                        contentTypes: {
-                            text: 25,      // Normal text
-                            code: 8,       // Code - faster
-                            thinking: 40,  // Thinking - deliberate
-                            bold: 18       // Bold text - slightly faster
-                        }
+                        baseSpeed: 20
+                        // Uses DEFAULT_CONTENT_TYPES automatically
                     })
                     : h(Markdown, { syntaxTheme: 'github', width: contentWidth }, content || '')
             )
