@@ -48,6 +48,48 @@ curl -sL https://raw.githubusercontent.com/roman-ryzenadvanced/OpenQode-Public-A
 
 ---
 
+## 📋 Launcher Menu Options
+
+When you launch OpenQode, you'll see a menu with several options. Here's what each one does:
+
+### 🏠 In-House Developed TUIs (Recommended)
+
+These are custom-built TUIs developed specifically for OpenQode:
+
+| Option | Name | Description |
+|--------|------|-------------|
+| **5** | **★ Next-Gen TUI (Gen 5)** | 🌟 **Recommended!** Full dashboard with split panes, animated borders, RGB visuals, interactive menus, streaming responses, and all intelligent features (SmartX, AutoRun, etc.) |
+| **4** | TUI Classic (Gen 4) | Lightweight single-stream interface. Good for low-resource terminals or simple tasks. |
+
+### 🔧 CLI Tools (Third-Party)
+
+Standard CLI tools that work alongside OpenQode:
+
+| Option | Name | Description |
+|--------|------|-------------|
+| **2** | Qwen TUI (CLI) | Uses the official `qwen` CLI. Requires `npm install -g @qwen-code/qwen-code` |
+| **3** | OpenCode TUI (Windows) | Windows-native `opencode.exe` binary. Windows only. |
+
+### 🌐 Web-Based Tools (Early Development)
+
+> ⚠️ **Community Contributions Welcome!** These tools are in early development and not actively maintained. If you're interested in contributing, feel free to fork and improve!
+
+| Option | Name | Description |
+|--------|------|-------------|
+| **1** | Web GUI | Browser-based interface at `http://localhost:15044` |
+| **7** | Web Assist Dashboard | Assistance dashboard (Windows: Option 7, Linux: N/A) |
+| **8** | Web IDE | Alpha web-based IDE (Windows: Option 8, Linux: N/A) |
+
+### 🛠️ Utilities
+
+| Option | Name | Description |
+|--------|------|-------------|
+| **6** | Agent Manager | Manage AI agents (Windows only, or edit files manually) |
+| **9** / **7** | 🔧 Smart Repair | AI-powered TUI self-healing. Diagnose and fix crashes automatically. |
+| **0** / **8** | Exit | Close the launcher |
+
+---
+
 ## 🆚 Which Version Should I Use?
 We recommend starting with **Next-Gen (Option 5)**!
 
