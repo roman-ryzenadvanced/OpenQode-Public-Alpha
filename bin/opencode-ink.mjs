@@ -1302,7 +1302,7 @@ const Sidebar = ({
                          : h(Text, { color: 'gray', dimColor: true }, 'OFF')
                  ),
                  h(Box, {},
-                     h(Text, { color: 'gray' }, 'SOLO:   '),
+                     h(Text, { color: 'gray' }, 'SmartX: '),
                      soloMode
                          ? h(Text, { color: 'magenta', bold: true }, 'ON')
                          : h(Text, { color: 'gray', dimColor: true }, 'OFF')
@@ -2266,11 +2266,11 @@ const App = () => {
 
     const [showTimeoutRow, setShowTimeoutRow] = useState(false);
     const [lastCheckpointText, setLastCheckpointText] = useState('');
-    // SOLO MODE STATE
+    // SMARTX ENGINE STATE
     const [soloMode, setSoloMode] = useState(false);
-    const [autoApprove, setAutoApprove] = useState(false); // Auto-execute commands in SOLO mode
+    const [autoApprove, setAutoApprove] = useState(false); // Auto-execute commands in SmartX Engine
 
-    // AUTO-APPROVE: Automatically execute commands in SOLO mode
+    // AUTO-APPROVE: Automatically execute commands in SmartX Engine
     useEffect(() => {
         if (autoApprove && soloMode && detectedCommands.length > 0 && !isExecutingCommands) {
             handleExecuteCommands(true);
@@ -2502,11 +2502,12 @@ const App = () => {
             const arg = parts.slice(1).join(' ');
 
             switch (cmd) {
-                case '/solo':
+                case '/smartx':
+                case '/solo': // Legacy alias
                     setSoloMode(prev => !prev);
                     setMessages(prev => [...prev, {
                         role: 'system',
-                        content: `🤖 **SOLO MODE: ${!soloMode ? 'ON (Auto-Heal Enabled)' : 'OFF'}**\nErrors will now be automatically reported to the agent for fixing.`
+                        content: `🤖 **SMARTX ENGINE: ${!soloMode ? 'ON (Auto-Heal Enabled)' : 'OFF'}**\nErrors will now be automatically reported to the agent for fixing.`
                     }]);
                     setInput('');
                     return;
@@ -2886,7 +2887,7 @@ const App = () => {
                     setAutoApprove(prev => !prev);
                     setMessages(prev => [...prev, { 
                         role: 'system', 
-                        content: !autoApprove ? '▶️ Auto-Approve **ENABLED** - Commands execute automatically in SOLO mode' : '⏸ Auto-Approve **DISABLED** - Commands require confirmation' 
+                        content: !autoApprove ? '▶️ Auto-Approve **ENABLED** - Commands execute automatically in SmartX Engine' : '⏸ Auto-Approve **DISABLED** - Commands require confirmation' 
                     }]);
                     setInput('');
                     return;
@@ -3439,9 +3440,9 @@ This gives the user a chance to refine requirements before implementation.
                 const cmds = extractCommands(responseText);
                 if (cmds.length > 0) {
                     setDetectedCommands(cmds);
-                    // SOLO MODE: AUTO-APPROVE
+                    // SMARTX ENGINE: AUTO-APPROVE
                     if (soloMode) {
-                        setMessages(prev => [...prev, { role: 'system', content: `🤖 **SOLO MODE**: Auto-executing ${cmds.length} detected command(s)...` }]);
+                        setMessages(prev => [...prev, { role: 'system', content: `🤖 **SMARTX ENGINE**: Auto-executing ${cmds.length} detected command(s)...` }]);
                         // Execute immediately, bypassing UI prompt
                         handleExecuteCommands(true, cmds);
                     }
@@ -3730,7 +3731,7 @@ This gives the user a chance to refine requirements before implementation.
             setIsExecutingCommands(false);
         }
 
-        // SOLO MODE: AUTO-HEAL
+        // SMARTX ENGINE: AUTO-HEAL
         // If any command failed, immediately report back to the agent
         const failures = results.filter(r => r.failed);
         if (soloMode && failures.length > 0 && !isCancelled) {
@@ -3953,10 +3954,10 @@ This gives the user a chance to refine requirements before implementation.
             { label: '/project      Project Info', value: '/project' },
             { label: '/write        Write Files', value: '/write' },
             { label: '/clear        Clear Session', value: '/clear' },
-                        // SOLO Mode toggle
+                        // SmartX Engine toggle
             soloMode
-                ? { label: '/solo off    SOLO Mode → OFF', value: '/solo off' }
-                : { label: '/solo on     SOLO Mode → ON', value: '/solo on' },
+                ? { label: '/solo off    SmartX Engine → OFF', value: '/smartx off' }
+                : { label: '/solo on     SmartX Engine → ON', value: '/smartx on' },
             // Auto-Approve toggle
             autoApprove
                 ? { label: '/auto        Auto-Approve → OFF', value: '/auto' }
@@ -3997,10 +3998,10 @@ This gives the user a chance to refine requirements before implementation.
                 offCmd: '/thinking off'
             },
             {
-                name: 'SOLO Mode',
+                name: 'SmartX Engine',
                 value: soloMode,
-                onCmd: '/solo on',
-                offCmd: '/solo off'
+                onCmd: '/smartx on',
+                offCmd: '/smartx off'
             },
             {
                 name: 'Auto-Approve',
@@ -4046,7 +4047,7 @@ This gives the user a chance to refine requirements before implementation.
                 h(Text, { color: 'gray' }, '  /project    Project Info'),
                 h(Text, { color: 'gray' }, '  /write      Write Files'),
                 h(Text, { color: 'gray' }, '  /clear      Clear Session'),
-                                h(Text, { color: 'gray' }, '  /solo       SOLO Mode On/Off'),
+                                h(Text, { color: 'gray' }, '  /solo       SmartX Engine On/Off'),
                 h(Text, { color: 'gray' }, '  /auto       Auto-Approve On/Off'),
                 h(Text, { color: 'gray' }, '  /exit       Exit TUI')
             ),
