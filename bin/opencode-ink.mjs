@@ -4191,8 +4191,8 @@ This gives the user a chance to refine requirements before implementation.
             h(Text, { color: 'magenta', bold: true }, '🎯 Select a Skill'),
             h(Text, { color: 'gray', dimColor: true }, 'Use ↑↓ to navigate, Enter to select'),
 
-            // Skill list with SelectInput
-            h(Box, { flexDirection: 'column', marginTop: 1, height: Math.min(18, rows - 8) },
+            // Skill list with SelectInput (24 skills total)
+            h(Box, { flexDirection: 'column', marginTop: 1, height: Math.min(28, rows - 6) },
                 h(SelectInput, {
                     items: skillItems,
                     onSelect: handleSkillSelect,
