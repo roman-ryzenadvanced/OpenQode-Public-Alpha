@@ -135,6 +135,38 @@ System-level autonomous execution. An extension of SmartX that grants the AI per
 
 ---
 
+## ⚙️ New Settings Panel
+
+The redesigned settings panel gives you one-click access to all features with live toggles:
+
+![Settings Panel](assets/settings-panel.png)
+
+### 📝 Session Memory (`/remember`, `/memory`)
+**NEW!** Persistent memory across sessions. The AI remembers facts about your project:
+```
+/remember User prefers TypeScript over JavaScript
+/memory     → View all remembered facts
+/forget 1   → Remove fact #1
+```
+
+### 🎯 Skills Library (`/skills`, `/skill`)
+**NEW!** 10 pre-built AI skill prompts for common tasks:
+- `test` - Generate unit tests
+- `refactor` - Code refactoring suggestions
+- `review` - Thorough code review
+- `docs` - Generate documentation
+- `security` - Security audit
+- `explain` - Explain code in simple terms
+
+### 🔧 Debug Logging (`/debug`)
+**NEW!** Toggle detailed API request/response logging for debugging:
+```
+/debug      → Toggle logging on/off
+/debugclear → Clear debug log
+```
+
+---
+
 ## 🔧 Smart Repair Agent v2.0
 
 When your TUI crashes or encounters errors, **Smart Repair** is an AI-powered self-healing system that diagnoses and fixes issues automatically.
