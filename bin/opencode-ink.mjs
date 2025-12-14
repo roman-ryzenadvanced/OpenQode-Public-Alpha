@@ -83,7 +83,7 @@ const MultiLineInput = ({ value, onChange, onSubmit, placeholder, isActive = tru
         // Calculate input width accounting for margins and borders
         const safeWidth = Math.max(20, columns - 10); // Leave margin for borders
         setInputWidth(safeWidth);
-        
+
         // Calculate height based on content but cap it to avoid taking too much space
         const lines = value.split('\n');
         const newHeight = Math.min(Math.max(3, lines.length + 1), 10); // Min 3 lines, max 10
@@ -185,15 +185,15 @@ const MultiLineInput = ({ value, onChange, onSubmit, placeholder, isActive = tru
             },
                 h(Text, { color: 'yellow', bold: true }, indicator)
             ),
-            h(Box, { 
-                borderStyle: 'single', 
-                borderColor: 'cyan', 
-                paddingX: 1, 
+            h(Box, {
+                borderStyle: 'single',
+                borderColor: 'cyan',
+                paddingX: 1,
                 minHeight: inputHeight,
                 maxHeight: 10
             },
-                lines.map((line, i) => 
-                    h(Text, { key: i, color: 'white', wrap: 'truncate' }, 
+                lines.map((line, i) =>
+                    h(Text, { key: i, color: 'white', wrap: 'truncate' },
                         i === lines.length - 1 && isActive && cursorVisible ? `${line}█` : line
                     )
                 )
@@ -203,32 +203,32 @@ const MultiLineInput = ({ value, onChange, onSubmit, placeholder, isActive = tru
 
     // Multi-line input - render with proper height and scrolling
     if (lineCount > 1 || value.length > 50) { // Show as multi-line if more than 1 line or long text
-        return h(Box, { 
-            flexDirection: 'column', 
+        return h(Box, {
+            flexDirection: 'column',
             width: inputWidth,
             minHeight: inputHeight,
             maxHeight: 10
         },
-            h(Box, { 
-                borderStyle: lineCount > 1 ? 'round' : 'single', 
-                borderColor: 'cyan', 
+            h(Box, {
+                borderStyle: lineCount > 1 ? 'round' : 'single',
+                borderColor: 'cyan',
                 paddingX: 1,
                 flexGrow: 1,
                 maxHeight: inputHeight
             },
-                lines.map((line, i) => 
-                    h(Text, { 
-                        key: i, 
-                        color: 'white', 
+                lines.map((line, i) =>
+                    h(Text, {
+                        key: i,
+                        color: 'white',
                         wrap: 'truncate',
                         maxWidth: inputWidth - 4 // Account for borders and padding
-                    }, 
+                    },
                         i === lines.length - 1 && isActive && cursorVisible ? `${line}█` : line
                     )
                 )
             ),
             h(Box, { marginTop: 0.5 },
-                h(Text, { color: 'gray', dimColor: true, fontSize: 0.8 }, 
+                h(Text, { color: 'gray', dimColor: true, fontSize: 0.8 },
                     `${lineCount} line${lineCount > 1 ? 's' : ''} | ${value.length} chars | Shift+Enter: new line, Enter: submit`)
             )
         );
@@ -237,7 +237,7 @@ const MultiLineInput = ({ value, onChange, onSubmit, placeholder, isActive = tru
     // Normal single-line input - show inline with proper truncation
     return h(Box, { flexDirection: 'row', width: inputWidth },
         h(Box, { borderStyle: 'single', borderColor: 'cyan', paddingX: 1, flexGrow: 1 },
-            h(Text, { color: 'white', wrap: 'truncate' }, 
+            h(Text, { color: 'white', wrap: 'truncate' },
                 displayValue + (isActive && cursorVisible && displayValue.length > 0 ? '█' : '')
             ),
             !displayValue && placeholder ? h(Text, { dimColor: true }, placeholder) : null,
@@ -737,76 +737,76 @@ const loadRecentProjects = () => {
 };
 
 // ═══════════════════════════════════════════════════════════════
- // POWER FEATURE 1: TODO TRACKER
- // Parses TODO/FIXME comments from project files
- // ═══════════════════════════════════════════════════════════════
- const parseTodos = (projectPath) => {
-     const todos = [];
-     const extensions = ['.js', '.ts', '.jsx', '.tsx', '.py', '.md', '.mjs'];
-     const todoPattern = /(?:\/\/|#|<!--)\s*(TODO|FIXME|HACK|XXX):?\s*(.+)/gi;
+// POWER FEATURE 1: TODO TRACKER
+// Parses TODO/FIXME comments from project files
+// ═══════════════════════════════════════════════════════════════
+const parseTodos = (projectPath) => {
+    const todos = [];
+    const extensions = ['.js', '.ts', '.jsx', '.tsx', '.py', '.md', '.mjs'];
+    const todoPattern = /(?:\/\/|#|<!--)\s*(TODO|FIXME|HACK|XXX):?\s*(.+)/gi;
 
-     const scanDir = (dir, depth = 0) => {
-         if (depth > 3) return; // Limit depth
-         try {
-             const entries = fs.readdirSync(dir, { withFileTypes: true });
-             for (const entry of entries) {
-                 if (entry.name.startsWith('.') || entry.name === 'node_modules') continue;
-                 const fullPath = path.join(dir, entry.name);
-                 if (entry.isDirectory()) {
-                     scanDir(fullPath, depth + 1);
-                 } else if (extensions.some(ext => entry.name.endsWith(ext))) {
-                     try {
-                         const content = fs.readFileSync(fullPath, 'utf8');
-                         const lines = content.split('\n');
-                         lines.forEach((line, idx) => {
-                             let match;
-                             while ((match = todoPattern.exec(line)) !== null) {
-                                 todos.push({
-                                     file: path.relative(projectPath, fullPath),
-                                     line: idx + 1,
-                                     type: match[1].toUpperCase(),
-                                     text: match[2].trim().substring(0, 50)
-                                 });
-                             }
-                         });
-                     } catch (e) { /* ignore unreadable files */ }
-                 }
-             }
-         } catch (e) { /* ignore */ }
-     };
+    const scanDir = (dir, depth = 0) => {
+        if (depth > 3) return; // Limit depth
+        try {
+            const entries = fs.readdirSync(dir, { withFileTypes: true });
+            for (const entry of entries) {
+                if (entry.name.startsWith('.') || entry.name === 'node_modules') continue;
+                const fullPath = path.join(dir, entry.name);
+                if (entry.isDirectory()) {
+                    scanDir(fullPath, depth + 1);
+                } else if (extensions.some(ext => entry.name.endsWith(ext))) {
+                    try {
+                        const content = fs.readFileSync(fullPath, 'utf8');
+                        const lines = content.split('\n');
+                        lines.forEach((line, idx) => {
+                            let match;
+                            while ((match = todoPattern.exec(line)) !== null) {
+                                todos.push({
+                                    file: path.relative(projectPath, fullPath),
+                                    line: idx + 1,
+                                    type: match[1].toUpperCase(),
+                                    text: match[2].trim().substring(0, 50)
+                                });
+                            }
+                        });
+                    } catch (e) { /* ignore unreadable files */ }
+                }
+            }
+        } catch (e) { /* ignore */ }
+    };
 
-     if (projectPath && fs.existsSync(projectPath)) {
-         scanDir(projectPath);
-     }
-     return todos.slice(0, 20); // Limit to 20 TODOs
- };
+    if (projectPath && fs.existsSync(projectPath)) {
+        scanDir(projectPath);
+    }
+    return todos.slice(0, 20); // Limit to 20 TODOs
+};
 
- // POWER FEATURE 2: MANAGED TODO LIST
- // Personal task list that users can add/maintain
- // ═══════════════════════════════════════════════════════════════
- const TODO_FILE = '.opencode/todos.json';
+// POWER FEATURE 2: MANAGED TODO LIST
+// Personal task list that users can add/maintain
+// ═══════════════════════════════════════════════════════════════
+const TODO_FILE = '.opencode/todos.json';
 
- const loadTodoList = (projectPath) => {
-     try {
-         const todoFilePath = path.join(projectPath || process.cwd(), TODO_FILE);
-         if (fs.existsSync(todoFilePath)) {
-             const content = fs.readFileSync(todoFilePath, 'utf8');
-             return JSON.parse(content);
-         }
-     } catch (e) { /* ignore */ }
-     return [];
- };
+const loadTodoList = (projectPath) => {
+    try {
+        const todoFilePath = path.join(projectPath || process.cwd(), TODO_FILE);
+        if (fs.existsSync(todoFilePath)) {
+            const content = fs.readFileSync(todoFilePath, 'utf8');
+            return JSON.parse(content);
+        }
+    } catch (e) { /* ignore */ }
+    return [];
+};
 
- const saveTodoList = (projectPath, todos) => {
-     try {
-         const todoDir = path.join(projectPath || process.cwd(), '.opencode');
-         if (!fs.existsSync(todoDir)) {
-             fs.mkdirSync(todoDir, { recursive: true });
-         }
-         const todoFilePath = path.join(projectPath || process.cwd(), TODO_FILE);
-         fs.writeFileSync(todoFilePath, JSON.stringify(todos, null, 2));
-     } catch (e) { /* ignore */ }
- };
+const saveTodoList = (projectPath, todos) => {
+    try {
+        const todoDir = path.join(projectPath || process.cwd(), '.opencode');
+        if (!fs.existsSync(todoDir)) {
+            fs.mkdirSync(todoDir, { recursive: true });
+        }
+        const todoFilePath = path.join(projectPath || process.cwd(), TODO_FILE);
+        fs.writeFileSync(todoFilePath, JSON.stringify(todos, null, 2));
+    } catch (e) { /* ignore */ }
+};
 
 // ═══════════════════════════════════════════════════════════════
 // POWER FEATURE 2: THEME SYSTEM
@@ -1050,53 +1050,53 @@ const SmoothCounter = ({ value }) => {
     return h(Text, { color: 'white' }, displayValue.toLocaleString());
 };
 
- // Component: TypewriterText - Clean text reveal for streaming (Opencode style)
- const TypewriterText = ({ children, speed = 25 }) => {
-     const fullText = String(children || '');
-     const [displayText, setDisplayText] = useState('');
-     const positionRef = useRef(0);
-     const timerRef = useRef(null);
+// Component: TypewriterText - Clean text reveal for streaming (Opencode style)
+const TypewriterText = ({ children, speed = 25 }) => {
+    const fullText = String(children || '');
+    const [displayText, setDisplayText] = useState('');
+    const positionRef = useRef(0);
+    const timerRef = useRef(null);
 
-     useEffect(() => {
-         // Reset when text changes
-         setDisplayText('');
-         positionRef.current = 0;
-         
-         if (timerRef.current) {
-             clearInterval(timerRef.current);
-         }
+    useEffect(() => {
+        // Reset when text changes
+        setDisplayText('');
+        positionRef.current = 0;
 
-         if (!fullText) {
-             return;
-         }
+        if (timerRef.current) {
+            clearInterval(timerRef.current);
+        }
 
-         // Use a steady typing rhythm (Opencode style - consistent speed)
-         timerRef.current = setInterval(() => {
-             if (positionRef.current >= fullText.length) {
-                 clearInterval(timerRef.current);
-                 return;
-             }
+        if (!fullText) {
+            return;
+        }
 
-             // Add one character at a time for smooth flow
-             const nextPos = positionRef.current + 1;
-             const newChar = fullText.charAt(positionRef.current);
-             
-             setDisplayText(prev => prev + newChar);
-             positionRef.current = nextPos;
-         }, speed);
+        // Use a steady typing rhythm (Opencode style - consistent speed)
+        timerRef.current = setInterval(() => {
+            if (positionRef.current >= fullText.length) {
+                clearInterval(timerRef.current);
+                return;
+            }
 
-         return () => {
-             if (timerRef.current) {
-                 clearInterval(timerRef.current);
-             }
-         };
-     }, [fullText, speed]);
+            // Add one character at a time for smooth flow
+            const nextPos = positionRef.current + 1;
+            const newChar = fullText.charAt(positionRef.current);
 
-     // Add a simple cursor effect like opencode TUI
-     const displayWithCursor = displayText + (Math.floor(Date.now() / 500) % 2 ? '|' : ' ');
+            setDisplayText(prev => prev + newChar);
+            positionRef.current = nextPos;
+        }, speed);
 
-     return h(Text, { wrap: 'wrap' }, displayWithCursor);
- };
+        return () => {
+            if (timerRef.current) {
+                clearInterval(timerRef.current);
+            }
+        };
+    }, [fullText, speed]);
+
+    // Add a simple cursor effect like opencode TUI
+    const displayWithCursor = displayText + (Math.floor(Date.now() / 500) % 2 ? '|' : ' ');
+
+    return h(Text, { wrap: 'wrap' }, displayWithCursor);
+};
 
 // Component: FadeInBox - Animated fade-in wrapper (simulates fade with opacity chars)
 const FadeInBox = ({ children, delay = 0 }) => {
@@ -1267,58 +1267,58 @@ const Sidebar = ({
 
         h(Text, {}, ''),
 
-         // FILE TREE (When focused or always? Let's show always if space)
-         isFocused ? (
-             h(Box, { flexDirection: 'column', flexGrow: 1, borderStyle: 'single', borderColor: 'blue', padding: 0 },
-                 h(FileTree, {
-                     rootPath: process.cwd(),
-                     onSelect: onSelectFile,
-                     selectedFiles: selectedFiles,
-                     isActive: isFocused,
-                     width: contentWidth,
-                     height: Math.max(10, 30 - 10) // Fixed height fallback, sidebarHeight was undefined
-                 })
-             )
-         ) : (
-             h(Box, { flexDirection: 'column' },
-                 // FEATURES STATUS - Show all ON/OFF (Only show if NOT browsing files)
-                 h(Text, { color: 'yellow' }, 'FEATURES'),
-                 h(Box, {},
-                     h(Text, { color: 'gray' }, 'Multi:  '),
-                     multiAgentEnabled
-                         ? h(Text, { color: 'green', bold: true }, 'ON')
-                         : h(Text, { color: 'gray', dimColor: true }, 'OFF')
-                 ),
-                 h(Box, {},
-                     h(Text, { color: 'gray' }, 'Context:'),
-                     contextEnabled
-                         ? h(Text, { color: 'green', bold: true }, 'ON')
-                         : h(Text, { color: 'gray', dimColor: true }, 'OFF')
-                 ),
-                 h(Box, {},
-                     h(Text, { color: 'gray' }, 'Think:  '),
-                     exposedThinking
-                         ? h(Text, { color: 'green', bold: true }, 'ON')
-                         : h(Text, { color: 'gray', dimColor: true }, 'OFF')
-                 ),
-                 h(Box, {},
-                     h(Text, { color: 'gray' }, 'SmartX: '),
-                     soloMode
-                         ? h(Text, { color: 'magenta', bold: true }, 'ON')
-                         : h(Text, { color: 'gray', dimColor: true }, 'OFF')
-                 ),
-                 h(Box, {},
-                     h(Text, { color: 'gray' }, 'AutoRun:'),
-                     autoApprove
-                         ? h(Text, { color: 'yellow', bold: true }, 'ON')
-                         : h(Text, { color: 'gray', dimColor: true }, 'OFF')
-                 ),
-                 h(Text, {}, ''),
+        // FILE TREE (When focused or always? Let's show always if space)
+        isFocused ? (
+            h(Box, { flexDirection: 'column', flexGrow: 1, borderStyle: 'single', borderColor: 'blue', padding: 0 },
+                h(FileTree, {
+                    rootPath: process.cwd(),
+                    onSelect: onSelectFile,
+                    selectedFiles: selectedFiles,
+                    isActive: isFocused,
+                    width: contentWidth,
+                    height: Math.max(10, 30 - 10) // Fixed height fallback, sidebarHeight was undefined
+                })
+            )
+        ) : (
+            h(Box, { flexDirection: 'column' },
+                // FEATURES STATUS - Show all ON/OFF (Only show if NOT browsing files)
+                h(Text, { color: 'yellow' }, 'FEATURES'),
+                h(Box, {},
+                    h(Text, { color: 'gray' }, 'Multi:  '),
+                    multiAgentEnabled
+                        ? h(Text, { color: 'green', bold: true }, 'ON')
+                        : h(Text, { color: 'gray', dimColor: true }, 'OFF')
+                ),
+                h(Box, {},
+                    h(Text, { color: 'gray' }, 'Context:'),
+                    contextEnabled
+                        ? h(Text, { color: 'green', bold: true }, 'ON')
+                        : h(Text, { color: 'gray', dimColor: true }, 'OFF')
+                ),
+                h(Box, {},
+                    h(Text, { color: 'gray' }, 'Think:  '),
+                    exposedThinking
+                        ? h(Text, { color: 'green', bold: true }, 'ON')
+                        : h(Text, { color: 'gray', dimColor: true }, 'OFF')
+                ),
+                h(Box, {},
+                    h(Text, { color: 'gray' }, 'SmartX: '),
+                    soloMode
+                        ? h(Text, { color: 'magenta', bold: true }, 'ON')
+                        : h(Text, { color: 'gray', dimColor: true }, 'OFF')
+                ),
+                h(Box, {},
+                    h(Text, { color: 'gray' }, 'AutoRun:'),
+                    autoApprove
+                        ? h(Text, { color: 'yellow', bold: true }, 'ON')
+                        : h(Text, { color: 'gray', dimColor: true }, 'OFF')
+                ),
+                h(Text, {}, ''),
 
-                 h(Text, { color: 'gray', dimColor: true }, 'Press TAB to'),
-                 h(Text, { color: 'gray', dimColor: true }, 'browse files')
-             )
-         ),
+                h(Text, { color: 'gray', dimColor: true }, 'Press TAB to'),
+                h(Text, { color: 'gray', dimColor: true }, 'browse files')
+            )
+        ),
 
         // Commands - minimal
         h(Text, { color: 'yellow', dimColor: true }, '/settings'),
@@ -1405,69 +1405,69 @@ const ArtifactBlock = ({ content, isStreaming }) => {
 // DISCORD-STYLE CODE CARD
 // Code blocks with header bar, language label, and distinct styling
 // ═══════════════════════════════════════════════════════════════
- const CodeCard = ({ language, filename, content, width, isStreaming }) => {
-     const lineCount = content.split('\n').length;
-     const [isExpanded, setIsExpanded] = useState(false);
+const CodeCard = ({ language, filename, content, width, isStreaming }) => {
+    const lineCount = content.split('\n').length;
+    const [isExpanded, setIsExpanded] = useState(false);
 
-     // Calculate safe content width accounting for spacing
-     const contentWidth = width ? width - 4 : 60; // Account for left gutter (2) and spacing (2)
+    // Calculate safe content width accounting for spacing
+    const contentWidth = width ? width - 4 : 60; // Account for left gutter (2) and spacing (2)
 
-     // Determine if we should show the expand/collapse functionality
-     const needsExpansion = lineCount > 10 && !isStreaming; // Don't expand during streaming
+    // Determine if we should show the expand/collapse functionality
+    const needsExpansion = lineCount > 10 && !isStreaming; // Don't expand during streaming
 
-     const renderContent = () => {
-         if (isExpanded || !needsExpansion) {
-             return h(Markdown, { syntaxTheme: 'github', width: contentWidth }, `\`\`\`${language}\n${content}\n\`\`\``);
-         }
+    const renderContent = () => {
+        if (isExpanded || !needsExpansion) {
+            return h(Markdown, { syntaxTheme: 'github', width: contentWidth }, `\`\`\`${language}\n${content}\n\`\`\``);
+        }
 
-         // Collapsed view: show first few and last few lines
-         const lines = content.split('\n');
-         if (lines.length <= 10) {
-             return h(Markdown, { syntaxTheme: 'github', width: contentWidth }, `\`\`\`${language}\n${content}\n\`\`\``);
-         }
+        // Collapsed view: show first few and last few lines
+        const lines = content.split('\n');
+        if (lines.length <= 10) {
+            return h(Markdown, { syntaxTheme: 'github', width: contentWidth }, `\`\`\`${language}\n${content}\n\`\`\``);
+        }
 
-         const firstLines = lines.slice(0, 5).join('\n');
-         const lastLines = lines.slice(-3).join('\n');
-         const previewContent = `${firstLines}\n... [${lineCount - 8} more lines]\n${lastLines}`;
+        const firstLines = lines.slice(0, 5).join('\n');
+        const lastLines = lines.slice(-3).join('\n');
+        const previewContent = `${firstLines}\n... [${lineCount - 8} more lines]\n${lastLines}`;
 
-         return h(Markdown, { syntaxTheme: 'github', width: contentWidth }, `\`\`\`${language}\n${previewContent}\n\`\`\``);
-     };
+        return h(Markdown, { syntaxTheme: 'github', width: contentWidth }, `\`\`\`${language}\n${previewContent}\n\`\`\``);
+    };
 
-     return h(Box, {
-         flexDirection: 'column',
-         width: width,
-         marginLeft: 2,
-         marginBottom: 1
-     },
-         // Simple header with filename and controls - opencode style
-         h(Box, {
-             flexDirection: 'row',
-             justifyContent: 'space-between',
-             marginBottom: 0.5
-         },
-             h(Text, { color: 'cyan', bold: true }, `${filename} (${language}) `),
-             h(Text, { color: 'gray', dimColor: true }, `${lineCount} lines`)
-         ),
+    return h(Box, {
+        flexDirection: 'column',
+        width: width,
+        marginLeft: 2,
+        marginBottom: 1
+    },
+        // Simple header with filename and controls - opencode style
+        h(Box, {
+            flexDirection: 'row',
+            justifyContent: 'space-between',
+            marginBottom: 0.5
+        },
+            h(Text, { color: 'cyan', bold: true }, `${filename} (${language}) `),
+            h(Text, { color: 'gray', dimColor: true }, `${lineCount} lines`)
+        ),
 
-         // Content area - no borders
-         h(Box, { 
-             borderStyle: 'single',
-             borderColor: 'gray',
-             padding: 1
-         },
-             renderContent()
-         ),
+        // Content area - no borders
+        h(Box, {
+            borderStyle: 'single',
+            borderColor: 'gray',
+            padding: 1
+        },
+            renderContent()
+        ),
 
-         // Expand/collapse control - simple text style
-         needsExpansion ? h(Box, {
-             flexDirection: 'row',
-             justifyContent: 'flex-end',
-             marginTop: 0.5
-         },
-             h(Text, { color: 'cyan', dimColor: true }, isExpanded ? '▼ collapse' : '▶ expand ')
-         ) : null
-     );
- };
+        // Expand/collapse control - simple text style
+        needsExpansion ? h(Box, {
+            flexDirection: 'row',
+            justifyContent: 'flex-end',
+            marginTop: 0.5
+        },
+            h(Text, { color: 'cyan', dimColor: true }, isExpanded ? '▼ collapse' : '▶ expand ')
+        ) : null
+    );
+};
 
 
 // ═══════════════════════════════════════════════════════════════
@@ -1520,47 +1520,47 @@ const UserCard = ({ content, width }) => {
     );
 };
 
- // AGENT CARD - Opencode-style clean streaming
- // Text-focused with minimal styling, clean left gutter
- const AgentCard = ({ content, isStreaming, width }) => {
-     const contentWidth = width ? width - 4 : undefined; // Account for left gutter and spacing
+// AGENT CARD - Opencode-style clean streaming
+// Text-focused with minimal styling, clean left gutter
+const AgentCard = ({ content, isStreaming, width }) => {
+    const contentWidth = width ? width - 4 : undefined; // Account for left gutter and spacing
 
-     return h(Box, {
-         flexDirection: 'row',
-         marginTop: 1,
-         marginBottom: 1,
-         width: width,
-     },
-         // Clean left gutter similar to opencode
-         h(Box, {
-             width: 2,
-             marginRight: 1,
-             borderStyle: 'single',
-             borderRight: false,
-             borderTop: false,
-             borderBottom: false,
-             borderLeftColor: isStreaming ? 'yellow' : 'green'
-         }),
+    return h(Box, {
+        flexDirection: 'row',
+        marginTop: 1,
+        marginBottom: 1,
+        width: width,
+    },
+        // Clean left gutter similar to opencode
+        h(Box, {
+            width: 2,
+            marginRight: 1,
+            borderStyle: 'single',
+            borderRight: false,
+            borderTop: false,
+            borderBottom: false,
+            borderLeftColor: isStreaming ? 'yellow' : 'green'
+        }),
 
-         // Content area - text focused, no boxy borders
-         h(Box, { 
-             flexDirection: 'column', 
-             flexGrow: 1, 
-             minWidth: 10 
-         },
-             // Content with streaming effect
-             h(Box, { width: contentWidth },
-                 isStreaming 
-                     ? h(TypewriterText, { 
-                         children: content || '', 
-                         speed: 35, // Optimal speed for readability
-                         batchSize: 1  // Single chars for smoothest flow
-                       })
-                     : h(Markdown, { syntaxTheme: 'github', width: contentWidth }, content || '')
-             )
-         )
-     );
- };
+        // Content area - text focused, no boxy borders
+        h(Box, {
+            flexDirection: 'column',
+            flexGrow: 1,
+            minWidth: 10
+        },
+            // Content with streaming effect
+            h(Box, { width: contentWidth },
+                isStreaming
+                    ? h(TypewriterText, {
+                        children: content || '',
+                        speed: 35, // Optimal speed for readability
+                        batchSize: 1  // Single chars for smoothest flow
+                    })
+                    : h(Markdown, { syntaxTheme: 'github', width: contentWidth }, content || '')
+            )
+        )
+    );
+};
 
 // ERROR CARD - Red gutter, no border
 const ErrorCard = ({ content, width }) => {
@@ -1600,90 +1600,90 @@ const MessageCard = ({ role, content, meta, isStreaming, width }) => {
 // UI COMPONENTS
 // ═══════════════════════════════════════════════════════════════
 
- // HELPER: Flatten messages into atomic blocks for granular scrolling
- // This enables the "3-4 line portion" look and prevents cutoff of long messages
- const flattenMessagesToBlocks = (messages) => {
-     const blocks = [];
-     let globalId = 0; // Global counter to ensure unique keys
+// HELPER: Flatten messages into atomic blocks for granular scrolling
+// This enables the "3-4 line portion" look and prevents cutoff of long messages
+const flattenMessagesToBlocks = (messages) => {
+    const blocks = [];
+    let globalId = 0; // Global counter to ensure unique keys
 
-     messages.forEach((msg, msgIndex) => {
-         // 1. User/System/Error: Treat as single block
-         if (msg.role !== 'assistant') {
-             blocks.push({
-                 ...msg,
-                 type: 'text',
-                 uiKey: `msg-${globalId++}`,
-                 isFirst: true,
-                 isLast: true
-             });
-             return;
-         }
+    messages.forEach((msg, msgIndex) => {
+        // 1. User/System/Error: Treat as single block
+        if (msg.role !== 'assistant') {
+            blocks.push({
+                ...msg,
+                type: 'text',
+                uiKey: `msg-${globalId++}`,
+                isFirst: true,
+                isLast: true
+            });
+            return;
+        }
 
-         // 2. Assistant: Parse into chunks
-         // Handle empty content (e.g. start of stream)
-         if (!msg.content) {
-             blocks.push({ role: 'assistant', type: 'text', content: '', uiKey: `msg-${globalId++}`, isFirst: true, isLast: true });
-             return;
-         }
+        // 2. Assistant: Parse into chunks
+        // Handle empty content (e.g. start of stream)
+        if (!msg.content) {
+            blocks.push({ role: 'assistant', type: 'text', content: '', uiKey: `msg-${globalId++}`, isFirst: true, isLast: true });
+            return;
+        }
 
-         // Split by code blocks AND Agent Tags
-         // Regex captures: Code blocks OR [AGENT: Name] tags
-         const parts = msg.content.split(/(```[\s\S]*?```|\[AGENT:[^\]]+\])/g);
-         let blockCount = 0;
+        // Split by code blocks AND Agent Tags
+        // Regex captures: Code blocks OR [AGENT: Name] tags
+        const parts = msg.content.split(/(```[\s\S]*?```|\[AGENT:[^\]]+\])/g);
+        let blockCount = 0;
 
-         parts.forEach((part, partIndex) => {
-             if (!part.trim()) return;
+        parts.forEach((part, partIndex) => {
+            if (!part.trim()) return;
 
-             if (part.startsWith('```')) {
-                 // Code Block
-                 blocks.push({
-                     role: 'assistant',
-                     type: 'code',
-                     content: part,
-                     uiKey: `msg-${globalId++}`,
-                     isFirst: blockCount === 0,
-                     isLast: false // to be updated later
-                 });
-                 blockCount++;
-             } else if (part.match(/^\[AGENT:/)) {
-                 // AGENT TAG BLOCK (New)
-                 const agentName = part.match(/\[AGENT:\s*([^\]]+)\]/)[1];
-                 blocks.push({
-                     role: 'assistant',
-                     type: 'agent_tag',
-                     name: agentName,
-                     content: part,
-                     uiKey: `msg-${globalId++}`,
-                     isFirst: blockCount === 0,
-                     isLast: false
-                 });
-                 blockCount++;
-             } else {
-                 // Text Paragraphs
-                 const paragraphs = part.split(/\n\s*\n/);
-                 paragraphs.forEach((para, paraIndex) => {
-                     if (!para.trim()) return;
-                     blocks.push({
-                         role: 'assistant',
-                         type: 'text',
-                         content: para.trim(), // Clean paragraph
-                         uiKey: `msg-${globalId++}`,
-                         isFirst: blockCount === 0,
-                         isLast: false
-                     });
-                     blockCount++;
-                 });
-             }
-         });
+            if (part.startsWith('```')) {
+                // Code Block
+                blocks.push({
+                    role: 'assistant',
+                    type: 'code',
+                    content: part,
+                    uiKey: `msg-${globalId++}`,
+                    isFirst: blockCount === 0,
+                    isLast: false // to be updated later
+                });
+                blockCount++;
+            } else if (part.match(/^\[AGENT:/)) {
+                // AGENT TAG BLOCK (New)
+                const agentName = part.match(/\[AGENT:\s*([^\]]+)\]/)[1];
+                blocks.push({
+                    role: 'assistant',
+                    type: 'agent_tag',
+                    name: agentName,
+                    content: part,
+                    uiKey: `msg-${globalId++}`,
+                    isFirst: blockCount === 0,
+                    isLast: false
+                });
+                blockCount++;
+            } else {
+                // Text Paragraphs
+                const paragraphs = part.split(/\n\s*\n/);
+                paragraphs.forEach((para, paraIndex) => {
+                    if (!para.trim()) return;
+                    blocks.push({
+                        role: 'assistant',
+                        type: 'text',
+                        content: para.trim(), // Clean paragraph
+                        uiKey: `msg-${globalId++}`,
+                        isFirst: blockCount === 0,
+                        isLast: false
+                    });
+                    blockCount++;
+                });
+            }
+        });
 
-         // Mark the last block of this message
-         if (blockCount > 0) {
-             blocks[blocks.length - 1].isLast = true;
-         }
-     });
+        // Mark the last block of this message
+        if (blockCount > 0) {
+            blocks[blocks.length - 1].isLast = true;
+        }
+    });
 
-     return blocks;
- };
+    return blocks;
+};
 
 // ═══════════════════════════════════════════════════════════════
 // SCROLLABLE CHAT - Virtual Viewport Engine
@@ -1776,94 +1776,94 @@ const LegacyScrollableChat = ({ messages, viewHeight, width, isActive = true, is
     );
 };
 
- const ScrollableChat = ({ messages, viewHeight, width, isActive = true, isStreaming = false }) => {
-     // Flatten messages into scrollable blocks
-     // Memoize to prevent expensive re-parsing on every cursor blink
-     const blocks = useMemo(() => flattenMessagesToBlocks(messages), [messages]);
+const ScrollableChat = ({ messages, viewHeight, width, isActive = true, isStreaming = false }) => {
+    // Flatten messages into scrollable blocks
+    // Memoize to prevent expensive re-parsing on every cursor blink
+    const blocks = useMemo(() => flattenMessagesToBlocks(messages), [messages]);
 
-     // State for scroll offset (BLOCK index, not message index)
-     const [scrollOffset, setScrollOffset] = useState(0);
-     const [autoScroll, setAutoScroll] = useState(true);
+    // State for scroll offset (BLOCK index, not message index)
+    const [scrollOffset, setScrollOffset] = useState(0);
+    const [autoScroll, setAutoScroll] = useState(true);
 
-     // Dynamic viewport calculation
-     // Since blocks are small (paragraphs), we can show more of them.
-     // Let's safe-guard: ViewHeight / 4 is a rough guess for how many blocks fit contextually.
-     const maxVisibleBlocks = Math.max(3, Math.floor(viewHeight / 4));
+    // Dynamic viewport calculation
+    // Since blocks are small (paragraphs), we can show more of them.
+    // Let's safe-guard: ViewHeight / 4 is a rough guess for how many blocks fit contextually.
+    const maxVisibleBlocks = Math.max(3, Math.floor(viewHeight / 4));
 
-     // Handle Input for Scrolling
-     useInput((input, key) => {
-         if (!isActive) return;
+    // Handle Input for Scrolling
+    useInput((input, key) => {
+        if (!isActive) return;
 
-         const maxOffset = Math.max(0, blocks.length - maxVisibleBlocks);
+        const maxOffset = Math.max(0, blocks.length - maxVisibleBlocks);
 
-         if (key.upArrow) {
-             setAutoScroll(false);
-             setScrollOffset(curr => Math.max(0, curr - 1));
-         }
-         if (key.downArrow) {
-             setScrollOffset(curr => {
-                 const next = Math.min(maxOffset, curr + 1);
-                 if (next >= maxOffset) setAutoScroll(true);
-                 return next;
-             });
-         }
-     });
+        if (key.upArrow) {
+            setAutoScroll(false);
+            setScrollOffset(curr => Math.max(0, curr - 1));
+        }
+        if (key.downArrow) {
+            setScrollOffset(curr => {
+                const next = Math.min(maxOffset, curr + 1);
+                if (next >= maxOffset) setAutoScroll(true);
+                return next;
+            });
+        }
+    });
 
-     // Auto-scroll to latest blocks
-     useEffect(() => {
-         if (autoScroll) {
-             const maxOffset = Math.max(0, blocks.length - maxVisibleBlocks);
-             setScrollOffset(maxOffset);
-         }
-     }, [blocks.length, autoScroll, maxVisibleBlocks]);
+    // Auto-scroll to latest blocks
+    useEffect(() => {
+        if (autoScroll) {
+            const maxOffset = Math.max(0, blocks.length - maxVisibleBlocks);
+            setScrollOffset(maxOffset);
+        }
+    }, [blocks.length, autoScroll, maxVisibleBlocks]);
 
-     // Slice for rendering
-     // We intentionally grab a few more blocks to ensure screen is full, 
-     // ink's overflow: hidden will clip the rest.
-     const visibleBlocks = blocks.slice(scrollOffset, scrollOffset + maxVisibleBlocks + 4);
+    // Slice for rendering
+    // We intentionally grab a few more blocks to ensure screen is full, 
+    // ink's overflow: hidden will clip the rest.
+    const visibleBlocks = blocks.slice(scrollOffset, scrollOffset + maxVisibleBlocks + 4);
 
-     return h(Box, {
-         flexDirection: 'column',
-         height: viewHeight,
-         overflow: 'hidden'
-     },
-         // Scroll Indicator
-         scrollOffset > 0 && h(Box, { flexShrink: 0 },
-             h(Text, { dimColor: true }, `↑ ${scrollOffset} earlier blocks...`)
-         ),
+    return h(Box, {
+        flexDirection: 'column',
+        height: viewHeight,
+        overflow: 'hidden'
+    },
+        // Scroll Indicator
+        scrollOffset > 0 && h(Box, { flexShrink: 0 },
+            h(Text, { dimColor: true }, `↑ ${scrollOffset} earlier blocks...`)
+        ),
 
-         // Blocks Container
-         h(Box, { flexDirection: 'column', flexGrow: 1, overflow: 'hidden' },
-             visibleBlocks.map((block) => {
-                 // Determine if this is the last assistant message and we're still streaming
-                 const lastMessage = messages[messages.length - 1];
-                 const isLastAssistantBlock = block.uiKey && block.uiKey.includes(`msg-${messages.length - 1}`);
-                 const isLastAssistantAndStreaming = 
-                     block.role === 'assistant' && 
-                     isLastAssistantBlock && 
-                     isStreaming;
-                 
-                 return h(ViewportMessage, {
-                     key: block.uiKey,
-                     role: block.role,
-                     content: block.content,
-                     meta: block.meta,
-                     width: width,
-                     isStreaming: isLastAssistantAndStreaming,
-                     // Pass context to help UI (e.g. continuous rails)
-                     isFirst: block.isFirst,
-                     isLast: block.isLast,
-                     type: block.type
-                 });
-             })
-         ),
+        // Blocks Container
+        h(Box, { flexDirection: 'column', flexGrow: 1, overflow: 'hidden' },
+            visibleBlocks.map((block) => {
+                // Determine if this is the last assistant message and we're still streaming
+                const lastMessage = messages[messages.length - 1];
+                const isLastAssistantBlock = block.uiKey && block.uiKey.includes(`msg-${messages.length - 1}`);
+                const isLastAssistantAndStreaming =
+                    block.role === 'assistant' &&
+                    isLastAssistantBlock &&
+                    isStreaming;
 
-         // Bottom Indicator
-         !autoScroll && h(Box, { flexShrink: 0, borderStyle: 'single', borderColor: 'yellow' },
-             h(Text, { color: 'yellow' }, `⚠ PAUSED - Press ↓ to resume`)
-         )
-     );
- };
+                return h(ViewportMessage, {
+                    key: block.uiKey,
+                    role: block.role,
+                    content: block.content,
+                    meta: block.meta,
+                    width: width,
+                    isStreaming: isLastAssistantAndStreaming,
+                    // Pass context to help UI (e.g. continuous rails)
+                    isFirst: block.isFirst,
+                    isLast: block.isLast,
+                    type: block.type
+                });
+            })
+        ),
+
+        // Bottom Indicator
+        !autoScroll && h(Box, { flexShrink: 0, borderStyle: 'single', borderColor: 'yellow' },
+            h(Text, { color: 'yellow' }, `⚠ PAUSED - Press ↓ to resume`)
+        )
+    );
+};
 
 // Message Item Component
 const MessageItem = ({ role, content, blocks = [], index }) => {
@@ -2131,15 +2131,15 @@ const ModelSelector = ({
     );
 };
 
- // ═══════════════════════════════════════════════════════════════
- // VIEWPORT MESSAGE - Unified Message Protocol Renderer (Alt)
- // Supports meta field for consistent styling
- // ═══════════════════════════════════════════════════════════════
- // ═══════════════════════════════════════════════════════════════
- // VIEWPORT MESSAGE - Unified Message Protocol Renderer (Alt)
- // Supports meta field for consistent styling
- // ═══════════════════════════════════════════════════════════════
- const ViewportMessage = ({ role, content, meta, width = 80, isFirst = true, isLast = true, type = 'text', blocks = [], isStreaming = false }) => {
+// ═══════════════════════════════════════════════════════════════
+// VIEWPORT MESSAGE - Unified Message Protocol Renderer (Alt)
+// Supports meta field for consistent styling
+// ═══════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════
+// VIEWPORT MESSAGE - Unified Message Protocol Renderer (Alt)
+// Supports meta field for consistent styling
+// ═══════════════════════════════════════════════════════════════
+const ViewportMessage = ({ role, content, meta, width = 80, isFirst = true, isLast = true, type = 'text', blocks = [], isStreaming = false }) => {
     // PRO API: Use ChatBubble for everything
 
     // For Assistant, we handle code blocks separately if they exist?
@@ -2164,14 +2164,14 @@ const ModelSelector = ({
         )
     */
 
- if (role === 'assistant') {
-         // Use the improved AgentCard for consistent streaming experience
-         return h(AgentCard, {
-             content: content,
-             isStreaming: isStreaming,
-             width: width
-         });
-     }
+    if (role === 'assistant') {
+        // Use the improved AgentCard for consistent streaming experience
+        return h(AgentCard, {
+            content: content,
+            isStreaming: isStreaming,
+            width: width
+        });
+    }
 
     // Delegate User/System to ChatBubble
     return h(ChatBubble, { role, content, meta, width });
@@ -2216,12 +2216,12 @@ const App = () => {
     const [remotes, setRemotes] = useState([]);
     const [gitBranch, setGitBranch] = useState('main');
 
-     // NEW: Project Creation State
-     const [newProjectName, setNewProjectName] = useState('');
+    // NEW: Project Creation State
+    const [newProjectName, setNewProjectName] = useState('');
 
-     // POWER FEATURE: Managed Todo List
-     const [todoList, setTodoList] = useState([]);
-     const [showTodoList, setShowTodoList] = useState(false);
+    // POWER FEATURE: Managed Todo List
+    const [todoList, setTodoList] = useState([]);
+    const [showTodoList, setShowTodoList] = useState(false);
 
     // NEW: Command Execution State
     const [detectedCommands, setDetectedCommands] = useState([]);
@@ -2247,11 +2247,11 @@ const App = () => {
     const [provider, setProvider] = useState('qwen');
     const [freeModel, setFreeModel] = useState('grok-code-fast-1');
 
-     // MODEL SELECTOR: Interactive model picker overlay
-     const [showModelSelector, setShowModelSelector] = useState(false);
-     
-     // TODO LIST OVERLAY
-     const [showTodoOverlay, setShowTodoOverlay] = useState(false);
+    // MODEL SELECTOR: Interactive model picker overlay
+    const [showModelSelector, setShowModelSelector] = useState(false);
+
+    // TODO LIST OVERLAY
+    const [showTodoOverlay, setShowTodoOverlay] = useState(false);
 
     // OPENCODE FEATURE: Permission Dialog
     const [pendingAction, setPendingAction] = useState(null); // { type: 'write'|'run', files: [], onApprove, onDeny }
@@ -2292,47 +2292,47 @@ const App = () => {
     // Calculate main content width
     const mainWidth = getMainWidth(layoutMode, sidebarWidth);
 
-     // Handle keyboard shortcuts (ESC for menu, Tab for sidebar)
-     useInput((input, key) => {
-         // Tab toggles sidebar in narrow mode
-         if (key.tab && appState === 'chat') {
-             if (layoutMode.mode === 'narrow' || layoutMode.mode === 'tiny') {
-                 setSidebarExpanded(prev => !prev);
-             }
-         }
+    // Handle keyboard shortcuts (ESC for menu, Tab for sidebar)
+    useInput((input, key) => {
+        // Tab toggles sidebar in narrow mode
+        if (key.tab && appState === 'chat') {
+            if (layoutMode.mode === 'narrow' || layoutMode.mode === 'tiny') {
+                setSidebarExpanded(prev => !prev);
+            }
+        }
 
-         // Ctrl+P opens command palette
-         if (input === 'p' && key.ctrl && appState === 'chat') {
-             setShowCommandPalette(prev => !prev);
-         }
+        // Ctrl+P opens command palette
+        if (input === 'p' && key.ctrl && appState === 'chat') {
+            setShowCommandPalette(prev => !prev);
+        }
 
-         // Ctrl+K also opens command palette (modern standard)
-         if (input === 'k' && key.ctrl && appState === 'chat') {
-             setShowCommandPalette(prev => !prev);
-         }
-         
-         // Ctrl+T opens todo list
-         if (input === 't' && key.ctrl && appState === 'chat') {
-             setShowTodoOverlay(prev => !prev);
-         }
+        // Ctrl+K also opens command palette (modern standard)
+        if (input === 'k' && key.ctrl && appState === 'chat') {
+            setShowCommandPalette(prev => !prev);
+        }
 
-         // ESC closes menus
-         if (key.escape) {
-             if (showTodoOverlay) {
-                 setShowTodoOverlay(false);
-             } else if (showCommandPalette) {
-                 setShowCommandPalette(false);
-             } else if (showAgentMenu) {
-                 if (agentMenuMode === 'add') {
-                     setAgentMenuMode('select');
-                 } else {
-                     setShowAgentMenu(false);
-                 }
-             } else if (showModelSelector) {
-                 setShowModelSelector(false);
-             }
-         }
-     });
+        // Ctrl+T opens todo list
+        if (input === 't' && key.ctrl && appState === 'chat') {
+            setShowTodoOverlay(prev => !prev);
+        }
+
+        // ESC closes menus
+        if (key.escape) {
+            if (showTodoOverlay) {
+                setShowTodoOverlay(false);
+            } else if (showCommandPalette) {
+                setShowCommandPalette(false);
+            } else if (showAgentMenu) {
+                if (agentMenuMode === 'add') {
+                    setAgentMenuMode('select');
+                } else {
+                    setShowAgentMenu(false);
+                }
+            } else if (showModelSelector) {
+                setShowModelSelector(false);
+            }
+        }
+    });
 
     // Build project options
     const recentProjects = loadRecentProjects();
@@ -2408,22 +2408,22 @@ const App = () => {
         }
     };
 
-     // Detect Git branch when project changes
-     useEffect(() => {
-         if (!project) return;
-         exec('git rev-parse --abbrev-ref HEAD', { cwd: project }, (err, stdout) => {
-             if (!err && stdout) {
-                 setGitBranch(stdout.trim());
-             }
-         });
-     }, [project]);
+    // Detect Git branch when project changes
+    useEffect(() => {
+        if (!project) return;
+        exec('git rev-parse --abbrev-ref HEAD', { cwd: project }, (err, stdout) => {
+            if (!err && stdout) {
+                setGitBranch(stdout.trim());
+            }
+        });
+    }, [project]);
 
-     // Load todo list when project changes
-     useEffect(() => {
-         if (!project) return;
-         const loadedTodos = loadTodoList(project);
-         setTodoList(loadedTodos);
-     }, [project]);
+    // Load todo list when project changes
+    useEffect(() => {
+        if (!project) return;
+        const loadedTodos = loadTodoList(project);
+        setTodoList(loadedTodos);
+    }, [project]);
 
     const parseResponse = useCallback((text) => {
         const blocks = [];
@@ -2883,11 +2883,11 @@ const App = () => {
                 // ═══════════════════════════════════════════════════════
                 // POWER FEATURES COMMANDS
                 // ═══════════════════════════════════════════════════════
-                                case '/auto':
+                case '/auto':
                     setAutoApprove(prev => !prev);
-                    setMessages(prev => [...prev, { 
-                        role: 'system', 
-                        content: !autoApprove ? '▶️ Auto-Approve **ENABLED** - Commands execute automatically in SmartX Engine' : '⏸ Auto-Approve **DISABLED** - Commands require confirmation' 
+                    setMessages(prev => [...prev, {
+                        role: 'system',
+                        content: !autoApprove ? '▶️ Auto-Approve **ENABLED** - Commands execute automatically in SmartX Engine' : '⏸ Auto-Approve **DISABLED** - Commands require confirmation'
                     }]);
                     setInput('');
                     return;
@@ -3003,10 +3003,10 @@ const App = () => {
                     }
                     setInput('');
                     return;
-                 case '/help':
-                     setMessages(prev => [...prev, {
-                         role: 'system',
-                         content: `## ⚡ Quick Commands
+                case '/help':
+                    setMessages(prev => [...prev, {
+                        role: 'system',
+                        content: `## ⚡ Quick Commands
 
  **AGENT**
  * \`/agents\` - Switch AI Persona
@@ -3048,14 +3048,14 @@ const App = () => {
  * \`/ssh\` - SSH Connection
  * \`/write\` - Write Pending Code Files
  * \`/clear\` - Reset Chat`,
-                         meta: {
-                             title: 'AVAILABLE COMMANDS',
-                             badge: '📚',
-                             borderColor: 'yellow'
-                         }
-                     }]);
-                     setInput('');
-                     return;
+                        meta: {
+                            title: 'AVAILABLE COMMANDS',
+                            badge: '📚',
+                            borderColor: 'yellow'
+                        }
+                    }]);
+                    setInput('');
+                    return;
 
                 case '/clear':
                     // Clear all messages
@@ -3118,105 +3118,105 @@ const App = () => {
                     })();
                     return;
 
-                 case '/todo':
-                 case '/todos':
-                     if (arg) {
-                         // Add a new todo
-                         addTodo(arg);
-                     } else {
-                         // Show todo list
-                         if (todoList.length === 0) {
-                             setMessages(prev => [...prev, { 
-                                 role: 'system', 
-                                 content: '📋 No tasks yet. Use /todo <task> to add one.' 
-                             }]);
-                         } else {
-                             const pending = todoList.filter(t => t.status === 'pending');
-                             const completed = todoList.filter(t => t.status === 'completed');
-                             
-                             let todoMessage = `📋 **Task List** (${pending.length} pending, ${completed.length} completed)\n\n`;
-                             if (pending.length > 0) {
-                                 todoMessage += "**Pending Tasks:**\n";
-                                 pending.forEach((t, i) => {
-                                     todoMessage += `  ${i + 1}. ${t.content}\n`;
-                                 });
-                                 todoMessage += "\n";
-                             }
-                             if (completed.length > 0) {
-                                 todoMessage += "**Completed Tasks:**\n";
-                                 completed.forEach((t, i) => {
-                                     todoMessage += `  ✓ ${t.content}\n`;
-                                 });
-                             }
-                             
-                             setMessages(prev => [...prev, { 
-                                 role: 'system', 
-                                 content: todoMessage 
-                             }]);
-                         }
-                     }
-                     setInput('');
-                     return;
+                case '/todo':
+                case '/todos':
+                    if (arg) {
+                        // Add a new todo
+                        addTodo(arg);
+                    } else {
+                        // Show todo list
+                        if (todoList.length === 0) {
+                            setMessages(prev => [...prev, {
+                                role: 'system',
+                                content: '📋 No tasks yet. Use /todo <task> to add one.'
+                            }]);
+                        } else {
+                            const pending = todoList.filter(t => t.status === 'pending');
+                            const completed = todoList.filter(t => t.status === 'completed');
 
-                 case '/todo-complete':
-                 case '/todo-done':
-                     if (arg) {
-                         // Find todo by ID or content
-                         const todoId = arg;
-                         const todo = todoList.find(t => t.id === todoId || t.content.includes(arg));
-                         if (todo) {
-                             completeTodo(todo.id);
-                             setMessages(prev => [...prev, { 
-                                 role: 'system', 
-                                 content: `✅ Completed task: ${todo.content}` 
-                             }]);
-                         } else {
-                             setMessages(prev => [...prev, { 
-                                 role: 'system', 
-                                 content: `❌ Task not found: ${arg}` 
-                             }]);
-                         }
-                     } else {
-                         setMessages(prev => [...prev, { 
-                             role: 'system', 
-                             content: '❌ Please specify a task to complete: /todo-complete <id or partial content>' 
-                         }]);
-                     }
-                     setInput('');
-                     return;
+                            let todoMessage = `📋 **Task List** (${pending.length} pending, ${completed.length} completed)\n\n`;
+                            if (pending.length > 0) {
+                                todoMessage += "**Pending Tasks:**\n";
+                                pending.forEach((t, i) => {
+                                    todoMessage += `  ${i + 1}. ${t.content}\n`;
+                                });
+                                todoMessage += "\n";
+                            }
+                            if (completed.length > 0) {
+                                todoMessage += "**Completed Tasks:**\n";
+                                completed.forEach((t, i) => {
+                                    todoMessage += `  ✓ ${t.content}\n`;
+                                });
+                            }
 
-                 case '/todo-delete':
-                 case '/todo-remove':
-                     if (arg) {
-                         // Find todo by ID or content
-                         const todo = todoList.find(t => t.id === arg || t.content.includes(arg));
-                         if (todo) {
-                             deleteTodo(todo.id);
-                             setMessages(prev => [...prev, { 
-                                 role: 'system', 
-                                 content: `🗑️ Removed task: ${todo.content}` 
-                             }]);
-                         } else {
-                             setMessages(prev => [...prev, { 
-                                 role: 'system', 
-                                 content: `❌ Task not found: ${arg}` 
-                             }]);
-                         }
-                     } else {
-                         setMessages(prev => [...prev, { 
-                             role: 'system', 
-                             content: '❌ Please specify a task to delete: /todo-delete <id or partial content>' 
-                         }]);
-                     }
-                     setInput('');
-                     return;
+                            setMessages(prev => [...prev, {
+                                role: 'system',
+                                content: todoMessage
+                            }]);
+                        }
+                    }
+                    setInput('');
+                    return;
 
-                 case '/write':
-                     if (pendingFiles.length === 0) {
-                         setMessages(prev => [...prev, { role: 'system', content: '⚠️ No pending files to write.' }]);
-                         setInput('');
-                         return;
-                     }
+                case '/todo-complete':
+                case '/todo-done':
+                    if (arg) {
+                        // Find todo by ID or content
+                        const todoId = arg;
+                        const todo = todoList.find(t => t.id === todoId || t.content.includes(arg));
+                        if (todo) {
+                            completeTodo(todo.id);
+                            setMessages(prev => [...prev, {
+                                role: 'system',
+                                content: `✅ Completed task: ${todo.content}`
+                            }]);
+                        } else {
+                            setMessages(prev => [...prev, {
+                                role: 'system',
+                                content: `❌ Task not found: ${arg}`
+                            }]);
+                        }
+                    } else {
+                        setMessages(prev => [...prev, {
+                            role: 'system',
+                            content: '❌ Please specify a task to complete: /todo-complete <id or partial content>'
+                        }]);
+                    }
+                    setInput('');
+                    return;
+
+                case '/todo-delete':
+                case '/todo-remove':
+                    if (arg) {
+                        // Find todo by ID or content
+                        const todo = todoList.find(t => t.id === arg || t.content.includes(arg));
+                        if (todo) {
+                            deleteTodo(todo.id);
+                            setMessages(prev => [...prev, {
+                                role: 'system',
+                                content: `🗑️ Removed task: ${todo.content}`
+                            }]);
+                        } else {
+                            setMessages(prev => [...prev, {
+                                role: 'system',
+                                content: `❌ Task not found: ${arg}`
+                            }]);
+                        }
+                    } else {
+                        setMessages(prev => [...prev, {
+                            role: 'system',
+                            content: '❌ Please specify a task to delete: /todo-delete <id or partial content>'
+                        }]);
+                    }
+                    setInput('');
+                    return;
+
+                case '/write':
+                    if (pendingFiles.length === 0) {
+                        setMessages(prev => [...prev, { role: 'system', content: '⚠️ No pending files to write.' }]);
+                        setInput('');
+                        return;
+                    }
 
                     // Prepare diffs for review
                     const diffsToReview = pendingFiles.map(file => {
@@ -3256,31 +3256,31 @@ const App = () => {
         setMessages(prev => [...prev, { role: 'assistant', content: '' }]);
 
         try {
-             // Build context-aware prompt with agent-specific instructions
-             let systemPrompt = `[SYSTEM CONTEXT]
+            // Build context-aware prompt with agent-specific instructions
+            let systemPrompt = `[SYSTEM CONTEXT]
  CURRENT WORKING DIRECTORY: ${process.cwd()}
  (CRITICAL: This is the ABSOLUTE SOURCE OF TRUTH. Ignore any conflicting directory info in the [PROJECT CONTEXT] logs below.)
 
  ` + loadAgentPrompt(agent);
 
-             // Add project context if enabled with enhanced context window
-             if (contextEnabled) {
-                 const projectContext = loadProjectContext(project);
-                 if (projectContext) {
-                     systemPrompt += '\n\n[PROJECT CONTEXT (HISTORY)]\n(WARNING: These logs may contain outdated path info. Trust SYSTEM CONTEXT CWD above over this.)\n' + projectContext;
-                 }
-                 
-                 // Enhanced context: Include recent conversation history for better continuity
-                 if (messages.length > 0) {
-                     const recentMessages = messages.slice(-6); // Last 3 exchanges (user+assistant)
-                     if (recentMessages.length > 0) {
-                         const recentContext = recentMessages.map(m => 
-                             `[PREVIOUS ${m.role.toUpperCase()}]: ${m.content.substring(0, 500)}` // Limit to prevent overflow
-                         ).join('\n');
-                         systemPrompt += `\n\n[RECENT CONVERSATION]\n${recentContext}\n(Use this for context continuity, but prioritize the current request)`;
-                     }
-                 }
-             }
+            // Add project context if enabled with enhanced context window
+            if (contextEnabled) {
+                const projectContext = loadProjectContext(project);
+                if (projectContext) {
+                    systemPrompt += '\n\n[PROJECT CONTEXT (HISTORY)]\n(WARNING: These logs may contain outdated path info. Trust SYSTEM CONTEXT CWD above over this.)\n' + projectContext;
+                }
+
+                // Enhanced context: Include recent conversation history for better continuity
+                if (messages.length > 0) {
+                    const recentMessages = messages.slice(-6); // Last 3 exchanges (user+assistant)
+                    if (recentMessages.length > 0) {
+                        const recentContext = recentMessages.map(m =>
+                            `[PREVIOUS ${m.role.toUpperCase()}]: ${m.content.substring(0, 500)}` // Limit to prevent overflow
+                        ).join('\n');
+                        systemPrompt += `\n\n[RECENT CONVERSATION]\n${recentContext}\n(Use this for context continuity, but prioritize the current request)`;
+                    }
+                }
+            }
 
             // MULTI-AGENT INSTRUCTION INJECTION
             if (multiAgentEnabled) {
@@ -3345,81 +3345,81 @@ This gives the user a chance to refine requirements before implementation.
             const fullPrompt = systemPrompt + '\n\n[USER REQUEST]\n' + fullText;
             let fullResponse = '';
 
-             // PROVIDER SWITCH: Use OpenCode Free or Qwen based on provider state
-             const result = provider === 'opencode-free'
-                 ? await callOpenCodeFree(fullPrompt, freeModel, (chunk) => {
-                     const cleanChunk = chunk.replace(/[\u001b\u009b][[\]()#;?]*(?:[0-9]{1,4}(?:;[0-9]{0,4})*)?[0-9A-ORZcf-nqry=><]/g, '');
+            // PROVIDER SWITCH: Use OpenCode Free or Qwen based on provider state
+            const result = provider === 'opencode-free'
+                ? await callOpenCodeFree(fullPrompt, freeModel, (chunk) => {
+                    const cleanChunk = chunk.replace(/[\u001b\u009b][[\]()#;?]*(?:[0-9]{1,4}(?:;[0-9]{0,4})*)?[0-9A-ORZcf-nqry=><]/g, '');
 
-                     // IMPROVED STREAM SPLITTING LOGIC (Thinking vs Content)
-                     // Claude Code style: cleaner separation of thinking from response
-                     const lines = cleanChunk.split('\n');
-                     let isThinkingChunk = false;
+                    // IMPROVED STREAM SPLITTING LOGIC (Thinking vs Content)
+                    // Claude Code style: cleaner separation of thinking from response
+                    const lines = cleanChunk.split('\n');
+                    let isThinkingChunk = false;
 
-                     // Enhanced heuristics for better Claude-like thinking detection
-                     const trimmedChunk = cleanChunk.trim();
-                     if (/^(Let me|Now let me|I'll|I need to|I should|I notice|I can|I will|Thinking:|Analyzing|Considering|Checking|Looking|Planning|First|Next|Finally)/i.test(trimmedChunk)) {
-                         isThinkingChunk = true;
-                     } else if (/^```|# |Here is|```|```|```/i.test(trimmedChunk)) {
-                         // If we encounter code blocks or headers, likely content not thinking
-                         isThinkingChunk = false;
-                     }
+                    // Enhanced heuristics for better Claude-like thinking detection
+                    const trimmedChunk = cleanChunk.trim();
+                    if (/^(Let me|Now let me|I'll|I need to|I should|I notice|I can|I will|Thinking:|Analyzing|Considering|Checking|Looking|Planning|First|Next|Finally)/i.test(trimmedChunk)) {
+                        isThinkingChunk = true;
+                    } else if (/^```|# |Here is|```|```|```/i.test(trimmedChunk)) {
+                        // If we encounter code blocks or headers, likely content not thinking
+                        isThinkingChunk = false;
+                    }
 
-                     // GLOBAL STATS UPDATE (Run for ALL chunks)
-                     setThinkingStats(prev => ({ ...prev, chars: prev.chars + cleanChunk.length }));
+                    // GLOBAL STATS UPDATE (Run for ALL chunks)
+                    setThinkingStats(prev => ({ ...prev, chars: prev.chars + cleanChunk.length }));
 
-                     // GLOBAL AGENT DETECTION (Run for ALL chunks)
-                     const agentMatch = cleanChunk.match(/\[AGENT:\s*([^\]]+)\]/i);
-                     if (agentMatch) {
-                         setThinkingStats(prev => ({ ...prev, activeAgent: agentMatch[1].trim() }));
-                     }
+                    // GLOBAL AGENT DETECTION (Run for ALL chunks)
+                    const agentMatch = cleanChunk.match(/\[AGENT:\s*([^\]]+)\]/i);
+                    if (agentMatch) {
+                        setThinkingStats(prev => ({ ...prev, activeAgent: agentMatch[1].trim() }));
+                    }
 
-                     if (isThinkingChunk) {
-                         setThinkingLines(prev => [...prev, ...lines.map(l => l.trim()).filter(l => l && !/^(Let me|Now let me|I'll|I need to|I notice)/i.test(l.trim()))]);
-                     } else {
-                         setMessages(prev => {
-                             const last = prev[prev.length - 1];
-                             if (last && last.role === 'assistant') {
-                                 return [...prev.slice(0, -1), { ...last, content: last.content + cleanChunk }];
-                             }
-                             return prev;
-                         });
-                     }
-                 })
-                 : await getQwen().sendMessage(fullPrompt, 'qwen-coder-plus', null, (chunk) => {
-                     const cleanChunk = chunk.replace(/[\u001b\u009b][[\]()#;?]*(?:[0-9]{1,4}(?:;[0-9]{0,4})*)?[0-9A-ORZcf-nqry=><]/g, '');
+                    if (isThinkingChunk) {
+                        setThinkingLines(prev => [...prev, ...lines.map(l => l.trim()).filter(l => l && !/^(Let me|Now let me|I'll|I need to|I notice)/i.test(l.trim()))]);
+                    } else {
+                        setMessages(prev => {
+                            const last = prev[prev.length - 1];
+                            if (last && last.role === 'assistant') {
+                                return [...prev.slice(0, -1), { ...last, content: last.content + cleanChunk }];
+                            }
+                            return prev;
+                        });
+                    }
+                })
+                : await getQwen().sendMessage(fullPrompt, 'qwen-coder-plus', null, (chunk) => {
+                    const cleanChunk = chunk.replace(/[\u001b\u009b][[\]()#;?]*(?:[0-9]{1,4}(?:;[0-9]{0,4})*)?[0-9A-ORZcf-nqry=><]/g, '');
 
-                     // IMPROVED STREAM SPLITTING LOGIC (Thinking vs Content)
-                     const lines = cleanChunk.split('\n');
-                     let isThinkingChunk = false;
+                    // IMPROVED STREAM SPLITTING LOGIC (Thinking vs Content)
+                    const lines = cleanChunk.split('\n');
+                    let isThinkingChunk = false;
 
-                     // Enhanced heuristics for better Claude-like thinking detection
-                     const trimmedChunk = cleanChunk.trim();
-                     if (/^(Let me|Now let me|I'll|I need to|I should|I notice|I can|I will|Thinking:|Analyzing|Considering|Checking|Looking|Planning|First|Next|Finally)/i.test(trimmedChunk)) {
-                         isThinkingChunk = true;
-                     } else if (/^```|# |Here is|```|```|```/i.test(trimmedChunk)) {
-                         // If we encounter code blocks or headers, likely content not thinking
-                         isThinkingChunk = false;
-                     }
+                    // Enhanced heuristics for better Claude-like thinking detection
+                    const trimmedChunk = cleanChunk.trim();
+                    if (/^(Let me|Now let me|I'll|I need to|I should|I notice|I can|I will|Thinking:|Analyzing|Considering|Checking|Looking|Planning|First|Next|Finally)/i.test(trimmedChunk)) {
+                        isThinkingChunk = true;
+                    } else if (/^```|# |Here is|```|```|```/i.test(trimmedChunk)) {
+                        // If we encounter code blocks or headers, likely content not thinking
+                        isThinkingChunk = false;
+                    }
 
-                     setThinkingStats(prev => ({ ...prev, chars: prev.chars + cleanChunk.length }));
+                    setThinkingStats(prev => ({ ...prev, chars: prev.chars + cleanChunk.length }));
 
-                     const agentMatch = cleanChunk.match(/\[AGENT:\s*([^\]]+)\]/i);
-                     if (agentMatch) {
-                         setThinkingStats(prev => ({ ...prev, activeAgent: agentMatch[1].trim() }));
-                     }
+                    const agentMatch = cleanChunk.match(/\[AGENT:\s*([^\]]+)\]/i);
+                    if (agentMatch) {
+                        setThinkingStats(prev => ({ ...prev, activeAgent: agentMatch[1].trim() }));
+                    }
 
-                     if (isThinkingChunk) {
-                         setThinkingLines(prev => [...prev, ...lines.map(l => l.trim()).filter(l => l && !/^(Let me|Now let me|I'll|I need to|I notice)/i.test(l.trim()))]);
-                     } else {
-                         setMessages(prev => {
-                             const last = prev[prev.length - 1];
-                             if (last && last.role === 'assistant') {
-                                 return [...prev.slice(0, -1), { ...last, content: last.content + cleanChunk }];
-                             }
-                             return prev;
-                         });
-                     }
-                 });
+                    if (isThinkingChunk) {
+                        setThinkingLines(prev => [...prev, ...lines.map(l => l.trim()).filter(l => l && !/^(Let me|Now let me|I'll|I need to|I notice)/i.test(l.trim()))]);
+                    } else {
+                        setMessages(prev => {
+                            const last = prev[prev.length - 1];
+                            if (last && last.role === 'assistant') {
+                                return [...prev.slice(0, -1), { ...last, content: last.content + cleanChunk }];
+                            }
+                            return prev;
+                        });
+                    }
+                });
 
             if (result.success) {
                 const responseText = result.response || fullResponse;
@@ -3625,42 +3625,42 @@ This gives the user a chance to refine requirements before implementation.
         }
     });
 
-     // Todo List Management Functions
-     const addTodo = (content) => {
-         const newTodo = {
-             id: Date.now().toString(),
-             content,
-             status: 'pending',
-             createdAt: new Date().toISOString(),
-         };
-         const updatedTodos = [...todoList, newTodo];
-         setTodoList(updatedTodos);
-         saveTodoList(project, updatedTodos);
-         setMessages(prev => [...prev, { 
-             role: 'system', 
-             content: `✅ Added task: ${content}` 
-         }]);
-     };
+    // Todo List Management Functions
+    const addTodo = (content) => {
+        const newTodo = {
+            id: Date.now().toString(),
+            content,
+            status: 'pending',
+            createdAt: new Date().toISOString(),
+        };
+        const updatedTodos = [...todoList, newTodo];
+        setTodoList(updatedTodos);
+        saveTodoList(project, updatedTodos);
+        setMessages(prev => [...prev, {
+            role: 'system',
+            content: `✅ Added task: ${content}`
+        }]);
+    };
 
-     const completeTodo = (id) => {
-         const updatedTodos = todoList.map(todo => 
-             todo.id === id ? { ...todo, status: 'completed', completedAt: new Date().toISOString() } : todo
-         );
-         setTodoList(updatedTodos);
-         saveTodoList(project, updatedTodos);
-     };
+    const completeTodo = (id) => {
+        const updatedTodos = todoList.map(todo =>
+            todo.id === id ? { ...todo, status: 'completed', completedAt: new Date().toISOString() } : todo
+        );
+        setTodoList(updatedTodos);
+        saveTodoList(project, updatedTodos);
+    };
 
-     const deleteTodo = (id) => {
-         const updatedTodos = todoList.filter(todo => todo.id !== id);
-         setTodoList(updatedTodos);
-         saveTodoList(project, updatedTodos);
-     };
+    const deleteTodo = (id) => {
+        const updatedTodos = todoList.filter(todo => todo.id !== id);
+        setTodoList(updatedTodos);
+        saveTodoList(project, updatedTodos);
+    };
 
-     const handleExecuteCommands = async (confirmed, cmdsOverride = null) => {
-         if (!confirmed) {
-             setDetectedCommands([]);
-             return;
-         }
+    const handleExecuteCommands = async (confirmed, cmdsOverride = null) => {
+        if (!confirmed) {
+            setDetectedCommands([]);
+            return;
+        }
 
         setIsExecutingCommands(true);
         setExecutionOutput([]); // Clear previous output
@@ -3954,10 +3954,10 @@ This gives the user a chance to refine requirements before implementation.
             { label: '/project      Project Info', value: '/project' },
             { label: '/write        Write Files', value: '/write' },
             { label: '/clear        Clear Session', value: '/clear' },
-                        // SmartX Engine toggle
+            // SmartX Engine toggle
             soloMode
-                ? { label: '/solo off    SmartX Engine → OFF', value: '/smartx off' }
-                : { label: '/solo on     SmartX Engine → ON', value: '/smartx on' },
+                ? { label: '/smartx off  SmartX → OFF', value: '/smartx off' }
+                : { label: '/smartx on   SmartX → ON', value: '/smartx on' },
             // Auto-Approve toggle
             autoApprove
                 ? { label: '/auto        Auto-Approve → OFF', value: '/auto' }
@@ -4047,7 +4047,7 @@ This gives the user a chance to refine requirements before implementation.
                 h(Text, { color: 'gray' }, '  /project    Project Info'),
                 h(Text, { color: 'gray' }, '  /write      Write Files'),
                 h(Text, { color: 'gray' }, '  /clear      Clear Session'),
-                                h(Text, { color: 'gray' }, '  /solo       SmartX Engine On/Off'),
+                h(Text, { color: 'gray' }, '  /solo       SmartX Engine On/Off'),
                 h(Text, { color: 'gray' }, '  /auto       Auto-Approve On/Off'),
                 h(Text, { color: 'gray' }, '  /exit       Exit TUI')
             ),
@@ -4159,70 +4159,70 @@ This gives the user a chance to refine requirements before implementation.
     // ═══════════════════════════════════════════════════════════════
 
     // Determine if we should show the Tab hint (narrow mode with sidebar collapsed)
-     // ═══════════════════════════════════════════════════════════════
-     // CONDITIONAL RENDER: Todo List Overlay
-     // ═══════════════════════════════════════════════════════════════
-     if (showTodoOverlay) {
-         return h(Box, {
-             flexDirection: 'column',
-             width: columns,
-             height: rows,
-             alignItems: 'center',
-             justifyContent: 'center'
-         },
-             h(TodoList, {
-                 tasks: todoList,
-                 onAddTask: addTodo,
-                 onCompleteTask: completeTodo,
-                 onDeleteTask: deleteTodo,
-                 width: Math.min(60, columns - 4)
-             }),
-             h(Box, { marginTop: 1 },
-                 h(Text, { dimColor: true }, 'Press Ctrl+T or Esc to close')
-             )
-         );
-     }
+    // ═══════════════════════════════════════════════════════════════
+    // CONDITIONAL RENDER: Todo List Overlay
+    // ═══════════════════════════════════════════════════════════════
+    if (showTodoOverlay) {
+        return h(Box, {
+            flexDirection: 'column',
+            width: columns,
+            height: rows,
+            alignItems: 'center',
+            justifyContent: 'center'
+        },
+            h(TodoList, {
+                tasks: todoList,
+                onAddTask: addTodo,
+                onCompleteTask: completeTodo,
+                onDeleteTask: deleteTodo,
+                width: Math.min(60, columns - 4)
+            }),
+            h(Box, { marginTop: 1 },
+                h(Text, { dimColor: true }, 'Press Ctrl+T or Esc to close')
+            )
+        );
+    }
 
-     // ═══════════════════════════════════════════════════════════════
-     // CONDITIONAL RENDER: Model Selector OR Dashboard (not both)
-     // ═══════════════════════════════════════════════════════════════
-     if (showModelSelector) {
-         return h(Box, {
-             flexDirection: 'column',
-             width: columns,
-             height: rows,
-             alignItems: 'center',
-             justifyContent: 'center'
-         },
-             // ... (ModelSelector implementation) ...
-             h(ModelSelector, {
-                 isOpen: true,
-                 currentModel: provider === 'opencode-free' ? freeModel : 'qwen-coder-plus',
-                 currentProvider: provider,
-                 width: Math.min(70, columns - 4),
-                 height: Math.min(rows - 4, 24),
-                 onSelect: (modelId, modelInfo) => {
-                     if (modelInfo.isFree) {
-                         setProvider('opencode-free');
-                         setFreeModel(modelId);
-                     } else {
-                         setProvider('qwen');
-                     }
-                     setShowModelSelector(false);
-                     setMessages(prev => [...prev, {
-                         role: 'system',
-                         content: `**🤖 Model Selected**\n\n${modelInfo.isFree ? '🆓' : '💰'} **${modelInfo.name}**\n${modelInfo.description || ''}`,
-                         meta: {
-                             title: 'MODEL CHANGED',
-                             badge: modelInfo.isFree ? '🆓' : '💰',
-                             borderColor: modelInfo.isFree ? 'green' : 'cyan'
-                         }
-                     }]);
-                 },
-                 onClose: () => setShowModelSelector(false)
-             })
-         );
-     }
+    // ═══════════════════════════════════════════════════════════════
+    // CONDITIONAL RENDER: Model Selector OR Dashboard (not both)
+    // ═══════════════════════════════════════════════════════════════
+    if (showModelSelector) {
+        return h(Box, {
+            flexDirection: 'column',
+            width: columns,
+            height: rows,
+            alignItems: 'center',
+            justifyContent: 'center'
+        },
+            // ... (ModelSelector implementation) ...
+            h(ModelSelector, {
+                isOpen: true,
+                currentModel: provider === 'opencode-free' ? freeModel : 'qwen-coder-plus',
+                currentProvider: provider,
+                width: Math.min(70, columns - 4),
+                height: Math.min(rows - 4, 24),
+                onSelect: (modelId, modelInfo) => {
+                    if (modelInfo.isFree) {
+                        setProvider('opencode-free');
+                        setFreeModel(modelId);
+                    } else {
+                        setProvider('qwen');
+                    }
+                    setShowModelSelector(false);
+                    setMessages(prev => [...prev, {
+                        role: 'system',
+                        content: `**🤖 Model Selected**\n\n${modelInfo.isFree ? '🆓' : '💰'} **${modelInfo.name}**\n${modelInfo.description || ''}`,
+                        meta: {
+                            title: 'MODEL CHANGED',
+                            badge: modelInfo.isFree ? '🆓' : '💰',
+                            borderColor: modelInfo.isFree ? 'green' : 'cyan'
+                        }
+                    }]);
+                },
+                onClose: () => setShowModelSelector(false)
+            })
+        );
+    }
 
     // ═══════════════════════════════════════════════════════════════
     // CONDITIONAL RENDER: Command Execution Overlay
@@ -4380,40 +4380,40 @@ This gives the user a chance to refine requirements before implementation.
                 // ═══════════════════════════════════════════════════════
                 // INPUT BAR (Pinned at bottom - NEVER pushed off)
                 // ═══════════════════════════════════════════════════════
-                 h(Box, {
-                     flexDirection: 'column',
-                     flexShrink: 0,         // CRITICAL: Never shrink
-                     height: INPUT_HEIGHT,  // Fixed height
-                     borderStyle: 'single',
-                     borderColor: isLoading ? 'yellow' : 'cyan',
-                     paddingX: 1
-                 },
-                     // Loading indicator with minimal visual noise
-                     isLoading
-                         ? h(Box, { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-                             h(Box, { flexDirection: 'row', gap: 1 },
-                                 h(Spinner, { type: 'dots' }),
-                                 h(Text, { color: 'yellow' }, loadingMessage || 'Thinking...')
-                             ),
-                             h(Text, { color: 'gray', dimColor: true }, 'type to interrupt')
-                         )
-                         : h(Box, { flexDirection: 'row', alignItems: 'center' },
-                             h(Text, { color: 'cyan', bold: true }, '> '),
-                             h(Box, { flexGrow: 1 },
-                                 h(TextInput, {
-                                     value: input,
-                                     onChange: (val) => {
-                                         // AUTO-CLOSE overlays when user starts typing
-                                         if (showModelSelector) setShowModelSelector(false);
-                                         if (showCommandPalette) setShowCommandPalette(false);
-                                         setInput(val);
-                                     },
-                                     onSubmit: handleSubmit,
-                                     placeholder: 'Type / for commands or enter your message...'
-                                 })
-                             )
-                         )
-                 )
+                h(Box, {
+                    flexDirection: 'column',
+                    flexShrink: 0,         // CRITICAL: Never shrink
+                    height: INPUT_HEIGHT,  // Fixed height
+                    borderStyle: 'single',
+                    borderColor: isLoading ? 'yellow' : 'cyan',
+                    paddingX: 1
+                },
+                    // Loading indicator with minimal visual noise
+                    isLoading
+                        ? h(Box, { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+                            h(Box, { flexDirection: 'row', gap: 1 },
+                                h(Spinner, { type: 'dots' }),
+                                h(Text, { color: 'yellow' }, loadingMessage || 'Thinking...')
+                            ),
+                            h(Text, { color: 'gray', dimColor: true }, 'type to interrupt')
+                        )
+                        : h(Box, { flexDirection: 'row', alignItems: 'center' },
+                            h(Text, { color: 'cyan', bold: true }, '> '),
+                            h(Box, { flexGrow: 1 },
+                                h(TextInput, {
+                                    value: input,
+                                    onChange: (val) => {
+                                        // AUTO-CLOSE overlays when user starts typing
+                                        if (showModelSelector) setShowModelSelector(false);
+                                        if (showCommandPalette) setShowCommandPalette(false);
+                                        setInput(val);
+                                    },
+                                    onSubmit: handleSubmit,
+                                    placeholder: 'Type / for commands or enter your message...'
+                                })
+                            )
+                        )
+                )
             );
         })()
     );
