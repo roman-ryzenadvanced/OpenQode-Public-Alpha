@@ -1050,12 +1050,28 @@ const SmoothCounter = ({ value }) => {
     return h(Text, { color: 'white' }, displayValue.toLocaleString());
 };
 
-// Component: TypewriterText - Clean text reveal for streaming (Opencode style)
-const TypewriterText = ({ children, speed = 25 }) => {
+// Component: ProfessionalTypewriter - Premium text streaming with advanced flow control
+// Default content type speeds (defined outside component for stable reference)
+const DEFAULT_CONTENT_TYPES = {
+    text: 25,      // Normal text - smooth flow
+    code: 8,       // Code - faster for readability  
+    thinking: 40,  // Thinking - deliberate pace
+    bold: 18       // Bold text - slightly faster
+};
+
+const ProfessionalTypewriter = ({
+    children,
+    baseSpeed = 20,
+    contentTypes = DEFAULT_CONTENT_TYPES
+}) => {
     const fullText = String(children || '');
     const [displayText, setDisplayText] = useState('');
     const positionRef = useRef(0);
     const timerRef = useRef(null);
+
+    // Use refs for values that shouldn't trigger re-render
+    const contentTypesRef = useRef(contentTypes);
+    contentTypesRef.current = contentTypes;
 
     useEffect(() => {
         // Reset when text changes
@@ -1063,40 +1079,56 @@ const TypewriterText = ({ children, speed = 25 }) => {
         positionRef.current = 0;
 
         if (timerRef.current) {
-            clearInterval(timerRef.current);
+            clearTimeout(timerRef.current);
         }
 
         if (!fullText) {
             return;
         }
 
-        // Use a steady typing rhythm (Opencode style - consistent speed)
-        timerRef.current = setInterval(() => {
+        // Professional streaming with intelligent pacing
+        const streamNext = () => {
             if (positionRef.current >= fullText.length) {
-                clearInterval(timerRef.current);
+                if (timerRef.current) clearTimeout(timerRef.current);
                 return;
             }
 
-            // Add one character at a time for smooth flow
-            const nextPos = positionRef.current + 1;
-            const newChar = fullText.charAt(positionRef.current);
+            // Look ahead to determine context-appropriate speed
+            const currentPos = positionRef.current;
+            const context = fullText.substring(Math.max(0, currentPos - 15), currentPos + 15);
+            const types = contentTypesRef.current;
 
-            setDisplayText(prev => prev + newChar);
-            positionRef.current = nextPos;
-        }, speed);
+            let speed = types.text;
+            if (context.includes('```')) speed = types.code;
+            else if (context.match(/^(Let me|Thinking|Analyzing)/i)) speed = types.thinking;
+            else if (context.includes('**') || context.includes('__')) speed = types.bold;
+
+            // Add the next character
+            const nextChar = fullText.charAt(positionRef.current);
+            setDisplayText(prev => prev + nextChar);
+            positionRef.current += 1;
+
+            // Schedule next character with context-aware timing
+            timerRef.current = setTimeout(streamNext, speed);
+        };
+
+        streamNext();
 
         return () => {
             if (timerRef.current) {
-                clearInterval(timerRef.current);
+                clearTimeout(timerRef.current);
             }
         };
-    }, [fullText, speed]);
+    }, [fullText]); // Only depend on fullText to prevent infinite loops
 
-    // Add a simple cursor effect like opencode TUI
-    const displayWithCursor = displayText + (Math.floor(Date.now() / 500) % 2 ? '|' : ' ');
+    // Professional cursor that feels natural
+    const displayWithCursor = displayText + (Math.floor(Date.now() / 500) % 2 ? '█' : ' ');
 
     return h(Text, { wrap: 'wrap' }, displayWithCursor);
 };
+
+// Maintain backward compatibility with TypewriterText alias
+const TypewriterText = ProfessionalTypewriter;
 
 // Component: FadeInBox - Animated fade-in wrapper (simulates fade with opacity chars)
 const FadeInBox = ({ children, delay = 0 }) => {
@@ -1520,8 +1552,8 @@ const UserCard = ({ content, width }) => {
     );
 };
 
-// AGENT CARD - Opencode-style clean streaming
-// Text-focused with minimal styling, clean left gutter
+// AGENT CARD - Professional content display with proper flow
+// Clean, structured presentation with smooth streaming
 const AgentCard = ({ content, isStreaming, width }) => {
     const contentWidth = width ? width - 4 : undefined; // Account for left gutter and spacing
 
@@ -1531,7 +1563,7 @@ const AgentCard = ({ content, isStreaming, width }) => {
         marginBottom: 1,
         width: width,
     },
-        // Clean left gutter similar to opencode
+        // Professional status indicator
         h(Box, {
             width: 2,
             marginRight: 1,
@@ -1539,22 +1571,27 @@ const AgentCard = ({ content, isStreaming, width }) => {
             borderRight: false,
             borderTop: false,
             borderBottom: false,
-            borderLeftColor: isStreaming ? 'yellow' : 'green'
+            borderLeftColor: isStreaming ? 'cyan' : 'green'
         }),
 
-        // Content area - text focused, no boxy borders
+        // Content area with proper flow
         h(Box, {
             flexDirection: 'column',
             flexGrow: 1,
             minWidth: 10
         },
-            // Content with streaming effect
+            // Content with professional streaming
             h(Box, { width: contentWidth },
                 isStreaming
-                    ? h(TypewriterText, {
+                    ? h(ProfessionalTypewriter, {
                         children: content || '',
-                        speed: 35, // Optimal speed for readability
-                        batchSize: 1  // Single chars for smoothest flow
+                        baseSpeed: 20,
+                        contentTypes: {
+                            text: 25,      // Normal text
+                            code: 8,       // Code - faster
+                            thinking: 40,  // Thinking - deliberate
+                            bold: 18       // Bold text - slightly faster
+                        }
                     })
                     : h(Markdown, { syntaxTheme: 'github', width: contentWidth }, content || '')
             )
@@ -3347,16 +3384,22 @@ This gives the user a chance to refine requirements before implementation.
             let fullResponse = '';
 
             // PROVIDER SWITCH: Use OpenCode Free or Qwen based on provider state
+            const streamStartTime = Date.now(); // Track start time for this request
+            let totalCharsReceived = 0; // Track total characters for speed calculation
+            let messageUpdateTimeout = null; // Debounce message updates to prevent excessive re-renders
+            let pendingContent = ''; // Buffer for pending content updates
+            let lastProcessedTime = Date.now(); // Track timing for flow control
+
             const result = provider === 'opencode-free'
                 ? await callOpenCodeFree(fullPrompt, freeModel, (chunk) => {
                     const cleanChunk = chunk.replace(/[\u001b\u009b][[\]()#;?]*(?:[0-9]{1,4}(?:;[0-9]{0,4})*)?[0-9A-ORZcf-nqry=><]/g, '');
 
                     // IMPROVED STREAM SPLITTING LOGIC (Thinking vs Content)
-                    // Claude Code style: cleaner separation of thinking from response
+                    // Professional separation of thinking from response
                     const lines = cleanChunk.split('\n');
                     let isThinkingChunk = false;
 
-                    // Enhanced heuristics for better Claude-like thinking detection
+                    // Enhanced heuristics for better thinking detection
                     const trimmedChunk = cleanChunk.trim();
                     if (/^(Let me|Now let me|I'll|I need to|I should|I notice|I can|I will|Thinking:|Analyzing|Considering|Checking|Looking|Planning|First|Next|Finally)/i.test(trimmedChunk)) {
                         isThinkingChunk = true;
@@ -3365,8 +3408,23 @@ This gives the user a chance to refine requirements before implementation.
                         isThinkingChunk = false;
                     }
 
+                    // Update character count for speed calculation
+                    totalCharsReceived += cleanChunk.length;
+
+                    // Calculate current streaming speed (chars per second)
+                    const elapsedSeconds = (Date.now() - streamStartTime) / 1000;
+                    const speed = elapsedSeconds > 0 ? Math.round(totalCharsReceived / elapsedSeconds) : 0;
+
+                    // Flow control - prevent overwhelming the UI
+                    const currentTime = Date.now();
+                    const timeSinceLastProcess = currentTime - lastProcessedTime;
+
                     // GLOBAL STATS UPDATE (Run for ALL chunks)
-                    setThinkingStats(prev => ({ ...prev, chars: prev.chars + cleanChunk.length }));
+                    setThinkingStats(prev => ({
+                        ...prev,
+                        chars: totalCharsReceived,
+                        speed: speed
+                    }));
 
                     // GLOBAL AGENT DETECTION (Run for ALL chunks)
                     const agentMatch = cleanChunk.match(/\[AGENT:\s*([^\]]+)\]/i);
@@ -3377,13 +3435,29 @@ This gives the user a chance to refine requirements before implementation.
                     if (isThinkingChunk) {
                         setThinkingLines(prev => [...prev, ...lines.map(l => l.trim()).filter(l => l && !/^(Let me|Now let me|I'll|I need to|I notice)/i.test(l.trim()))]);
                     } else {
-                        setMessages(prev => {
-                            const last = prev[prev.length - 1];
-                            if (last && last.role === 'assistant') {
-                                return [...prev.slice(0, -1), { ...last, content: last.content + cleanChunk }];
-                            }
-                            return prev;
-                        });
+                        // Buffer the content with flow control
+                        pendingContent += cleanChunk;
+                        lastProcessedTime = currentTime;
+
+                        // Clear existing timeout
+                        if (messageUpdateTimeout) {
+                            clearTimeout(messageUpdateTimeout);
+                        }
+
+                        // Use adaptive timing based on content flow
+                        const adaptiveDelay = Math.max(8, 16 - Math.min(8, speed / 10)); // Faster streams get less delay
+
+                        // Set new timeout to batch updates with flow control
+                        messageUpdateTimeout = setTimeout(() => {
+                            setMessages(prev => {
+                                const last = prev[prev.length - 1];
+                                if (last && last.role === 'assistant') {
+                                    return [...prev.slice(0, -1), { ...last, content: last.content + pendingContent }];
+                                }
+                                return [...prev, { role: 'assistant', content: pendingContent }];
+                            });
+                            pendingContent = ''; // Clear the buffer after update
+                        }, adaptiveDelay);
                     }
                 })
                 : await getQwen().sendMessage(fullPrompt, 'qwen-coder-plus', null, (chunk) => {
@@ -3393,7 +3467,7 @@ This gives the user a chance to refine requirements before implementation.
                     const lines = cleanChunk.split('\n');
                     let isThinkingChunk = false;
 
-                    // Enhanced heuristics for better Claude-like thinking detection
+                    // Enhanced heuristics for better thinking detection
                     const trimmedChunk = cleanChunk.trim();
                     if (/^(Let me|Now let me|I'll|I need to|I should|I notice|I can|I will|Thinking:|Analyzing|Considering|Checking|Looking|Planning|First|Next|Finally)/i.test(trimmedChunk)) {
                         isThinkingChunk = true;
@@ -3402,7 +3476,18 @@ This gives the user a chance to refine requirements before implementation.
                         isThinkingChunk = false;
                     }
 
-                    setThinkingStats(prev => ({ ...prev, chars: prev.chars + cleanChunk.length }));
+                    // Update character count for speed calculation (using same variable as OpenCode path)
+                    totalCharsReceived += cleanChunk.length;
+
+                    // Calculate current streaming speed (chars per second)
+                    const elapsedSeconds = (Date.now() - streamStartTime) / 1000;
+                    const speed = elapsedSeconds > 0 ? Math.round(totalCharsReceived / elapsedSeconds) : 0;
+
+                    setThinkingStats(prev => ({
+                        ...prev,
+                        chars: totalCharsReceived,
+                        speed: speed
+                    }));
 
                     const agentMatch = cleanChunk.match(/\[AGENT:\s*([^\]]+)\]/i);
                     if (agentMatch) {
@@ -3412,13 +3497,29 @@ This gives the user a chance to refine requirements before implementation.
                     if (isThinkingChunk) {
                         setThinkingLines(prev => [...prev, ...lines.map(l => l.trim()).filter(l => l && !/^(Let me|Now let me|I'll|I need to|I notice)/i.test(l.trim()))]);
                     } else {
-                        setMessages(prev => {
-                            const last = prev[prev.length - 1];
-                            if (last && last.role === 'assistant') {
-                                return [...prev.slice(0, -1), { ...last, content: last.content + cleanChunk }];
-                            }
-                            return prev;
-                        });
+                        // Buffer the content with flow control
+                        pendingContent += cleanChunk;
+                        lastProcessedTime = Date.now();
+
+                        // Clear existing timeout
+                        if (messageUpdateTimeout) {
+                            clearTimeout(messageUpdateTimeout);
+                        }
+
+                        // Use adaptive timing based on content flow
+                        const adaptiveDelay = Math.max(8, 16 - Math.min(8, speed / 10)); // Faster streams get less delay
+
+                        // Set new timeout to batch updates with flow control
+                        messageUpdateTimeout = setTimeout(() => {
+                            setMessages(prev => {
+                                const last = prev[prev.length - 1];
+                                if (last && last.role === 'assistant') {
+                                    return [...prev.slice(0, -1), { ...last, content: last.content + pendingContent }];
+                                }
+                                return [...prev, { role: 'assistant', content: pendingContent }];
+                            });
+                            pendingContent = ''; // Clear the buffer after update
+                        }, adaptiveDelay);
                     }
                 });
 
