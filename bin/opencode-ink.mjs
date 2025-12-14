@@ -51,6 +51,16 @@ import { getContextManager } from '../lib/context-manager.mjs';
 import { getAllSkills, getSkill, executeSkill, getSkillListDisplay } from '../lib/skills.mjs';
 import { getDebugLogger, initFromArgs } from '../lib/debug-logger.mjs';
 import { processCommand, isCommand } from '../lib/command-processor.mjs';
+import {
+    getSystemPrompt,
+    formatCodeBlock,
+    formatToolResult,
+    formatError,
+    formatSuccess,
+    formatWarning,
+    formatFileOperation,
+    separator
+} from '../lib/agent-prompt.mjs';
 
 // Initialize debug logger from CLI args
 const debugLogger = initFromArgs();
