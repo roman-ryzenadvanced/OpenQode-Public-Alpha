@@ -92,18 +92,55 @@ const getAuthToken = () => {
 
 // Trigger OAuth authentication
 const triggerOAuth = async () => {
-    console.log(C.yellow + '\n[!] Authentication required. Opening browser for Qwen OAuth...' + C.reset);
+    console.log(C.yellow + '\n[!] Authentication required. Starting Qwen OAuth...' + C.reset);
     try {
         const { QwenOAuth } = await import('../qwen-oauth.mjs');
         const oauth = new QwenOAuth();
-        const tokens = await oauth.authenticate();
+
+        // Start device code flow
+        const deviceInfo = await oauth.startDeviceFlow();
+
+        console.log('');
+        console.log(C.magenta + '  ╔═══════════════════════════════════════════╗' + C.reset);
+        console.log(C.magenta + '  ║          QWEN AUTHENTICATION              ║' + C.reset);
+        console.log(C.magenta + '  ╚═══════════════════════════════════════════╝' + C.reset);
+        console.log('');
+        console.log(C.yellow + '  1. Open this URL in your browser:' + C.reset);
+        console.log(C.cyan + `     ${deviceInfo.verificationUriComplete || deviceInfo.verificationUri}` + C.reset);
+        console.log('');
+        if (deviceInfo.userCode) {
+            console.log(C.yellow + '  2. Enter this code if prompted:' + C.reset);
+            console.log(C.green + C.bold + `     ${deviceInfo.userCode}` + C.reset);
+            console.log('');
+        }
+        console.log(C.dim + '  Waiting for you to complete login in browser...' + C.reset);
+
+        // Try to open browser automatically
+        const { exec } = require('child_process');
+        const url = deviceInfo.verificationUriComplete || deviceInfo.verificationUri;
+        const platform = process.platform;
+        const cmd = platform === 'darwin' ? `open "${url}"` : platform === 'win32' ? `start "" "${url}"` : `xdg-open "${url}"`;
+        exec(cmd, () => { });
+
+        // Poll for tokens
+        const tokens = await oauth.pollForTokens();
+
         if (tokens && tokens.access_token) {
-            fs.writeFileSync(TOKENS_FILE, JSON.stringify(tokens, null, 2));
-            console.log(C.green + '[✓] Authentication successful!' + C.reset);
+            // Save tokens
+            oauth.saveTokens(tokens);
+            fs.writeFileSync(TOKENS_FILE, JSON.stringify({
+                access_token: tokens.access_token,
+                refresh_token: tokens.refresh_token,
+                expires_at: tokens.expires_at || new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
+            }, null, 2));
+            console.log(C.green + '\n[✓] Authentication successful!' + C.reset);
             return tokens.access_token;
         }
     } catch (e) {
         console.log(C.red + `[✗] OAuth failed: ${e.message}` + C.reset);
+        if (e.message.includes('Client ID')) {
+            console.log(C.yellow + '\n  To fix: Copy config.example.cjs to config.cjs and add your QWEN_OAUTH_CLIENT_ID' + C.reset);
+        }
     }
     return null;
 };
