@@ -375,7 +375,7 @@ IMPORTANT RULES:
 
         return new Promise((resolve) => {
             try {
-                console.log('Sending message via qwen CLI:', finalMessage.substring(0, 50) + '...');
+                // Debug log removed for clean UI
 
                 // Run in current project directory to allow context access
                 const neutralCwd = process.cwd();
@@ -428,7 +428,7 @@ IMPORTANT RULES:
                     // Clean up ANSI codes
                     const cleanResponse = stdout.replace(/[\u001b\u009b][[\]()#;?]*(?:[0-9]{1,4}(?:;[0-9]{0,4})*)?[0-9A-ORZcf-nqry=><]/g, '').trim();
 
-                    console.log('Qwen CLI response received:', cleanResponse.substring(0, 100) + '...');
+                    // Debug log removed for clean UI
 
                     if (cleanResponse) {
                         resolve({
