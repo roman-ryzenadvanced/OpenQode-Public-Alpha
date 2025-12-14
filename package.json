@@ -1,6 +1,6 @@
 {
   "name": "openqode-tui",
-  "version": "1.2.1",
+  "version": "1.2.2",
   "author": "Trae & Gemini",
   "private": true,
   "dependencies": {
@@ -12,6 +12,10 @@
     "ink-select-input": "^5.0.0",
     "clipboardy": "^4.0.0",
     "he": "^1.2.0"
+  },
+  "overrides": {
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0"
   },
   "scripts": {
     "start": "node bin/opencode-ink.mjs"
