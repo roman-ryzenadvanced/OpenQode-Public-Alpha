@@ -3386,9 +3386,6 @@ This gives the user a chance to refine requirements before implementation.
             // PROVIDER SWITCH: Use OpenCode Free or Qwen based on provider state
             const streamStartTime = Date.now(); // Track start time for this request
             let totalCharsReceived = 0; // Track total characters for speed calculation
-            let messageUpdateTimeout = null; // Debounce message updates to prevent excessive re-renders
-            let pendingContent = ''; // Buffer for pending content updates
-            let lastProcessedTime = Date.now(); // Track timing for flow control
 
             const result = provider === 'opencode-free'
                 ? await callOpenCodeFree(fullPrompt, freeModel, (chunk) => {
@@ -3415,10 +3412,6 @@ This gives the user a chance to refine requirements before implementation.
                     const elapsedSeconds = (Date.now() - streamStartTime) / 1000;
                     const speed = elapsedSeconds > 0 ? Math.round(totalCharsReceived / elapsedSeconds) : 0;
 
-                    // Flow control - prevent overwhelming the UI
-                    const currentTime = Date.now();
-                    const timeSinceLastProcess = currentTime - lastProcessedTime;
-
                     // GLOBAL STATS UPDATE (Run for ALL chunks)
                     setThinkingStats(prev => ({
                         ...prev,
@@ -3435,29 +3428,14 @@ This gives the user a chance to refine requirements before implementation.
                     if (isThinkingChunk) {
                         setThinkingLines(prev => [...prev, ...lines.map(l => l.trim()).filter(l => l && !/^(Let me|Now let me|I'll|I need to|I notice)/i.test(l.trim()))]);
                     } else {
-                        // Buffer the content with flow control
-                        pendingContent += cleanChunk;
-                        lastProcessedTime = currentTime;
-
-                        // Clear existing timeout
-                        if (messageUpdateTimeout) {
-                            clearTimeout(messageUpdateTimeout);
-                        }
-
-                        // Use adaptive timing based on content flow
-                        const adaptiveDelay = Math.max(8, 16 - Math.min(8, speed / 10)); // Faster streams get less delay
-
-                        // Set new timeout to batch updates with flow control
-                        messageUpdateTimeout = setTimeout(() => {
-                            setMessages(prev => {
-                                const last = prev[prev.length - 1];
-                                if (last && last.role === 'assistant') {
-                                    return [...prev.slice(0, -1), { ...last, content: last.content + pendingContent }];
-                                }
-                                return [...prev, { role: 'assistant', content: pendingContent }];
-                            });
-                            pendingContent = ''; // Clear the buffer after update
-                        }, adaptiveDelay);
+                        // Direct message update - simple and stable
+                        setMessages(prev => {
+                            const last = prev[prev.length - 1];
+                            if (last && last.role === 'assistant') {
+                                return [...prev.slice(0, -1), { ...last, content: last.content + cleanChunk }];
+                            }
+                            return prev;
+                        });
                     }
                 })
                 : await getQwen().sendMessage(fullPrompt, 'qwen-coder-plus', null, (chunk) => {
@@ -3497,29 +3475,14 @@ This gives the user a chance to refine requirements before implementation.
                     if (isThinkingChunk) {
                         setThinkingLines(prev => [...prev, ...lines.map(l => l.trim()).filter(l => l && !/^(Let me|Now let me|I'll|I need to|I notice)/i.test(l.trim()))]);
                     } else {
-                        // Buffer the content with flow control
-                        pendingContent += cleanChunk;
-                        lastProcessedTime = Date.now();
-
-                        // Clear existing timeout
-                        if (messageUpdateTimeout) {
-                            clearTimeout(messageUpdateTimeout);
-                        }
-
-                        // Use adaptive timing based on content flow
-                        const adaptiveDelay = Math.max(8, 16 - Math.min(8, speed / 10)); // Faster streams get less delay
-
-                        // Set new timeout to batch updates with flow control
-                        messageUpdateTimeout = setTimeout(() => {
-                            setMessages(prev => {
-                                const last = prev[prev.length - 1];
-                                if (last && last.role === 'assistant') {
-                                    return [...prev.slice(0, -1), { ...last, content: last.content + pendingContent }];
-                                }
-                                return [...prev, { role: 'assistant', content: pendingContent }];
-                            });
-                            pendingContent = ''; // Clear the buffer after update
-                        }, adaptiveDelay);
+                        // Direct message update - simple and stable
+                        setMessages(prev => {
+                            const last = prev[prev.length - 1];
+                            if (last && last.role === 'assistant') {
+                                return [...prev.slice(0, -1), { ...last, content: last.content + cleanChunk }];
+                            }
+                            return prev;
+                        });
                     }
                 });
 
