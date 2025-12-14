@@ -73,20 +73,28 @@ const banner = () => {
     console.log('');
 };
 
-// Get Qwen auth token
+// Get Qwen auth token - checks multiple locations
 const getAuthToken = () => {
-    try {
-        if (fs.existsSync(TOKENS_FILE)) {
-            const tokens = JSON.parse(fs.readFileSync(TOKENS_FILE, 'utf8'));
-            return tokens.access_token || null;
-        }
-        // Try qwen CLI config
-        const configPath = path.join(process.env.HOME || process.env.USERPROFILE, '.qwen', 'config.json');
-        if (fs.existsSync(configPath)) {
-            const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
-            return config.access_token || config.api_key || null;
-        }
-    } catch (e) { /* ignore */ }
+    // Multiple paths where tokens might be stored
+    const tokenPaths = [
+        path.join(ROOT, '.qwen-tokens.json'),      // QwenOAuth default
+        path.join(ROOT, 'tokens.json'),            // Alternative location
+        path.join(process.env.HOME || process.env.USERPROFILE || '', '.qwen', 'config.json'),  // qwen CLI
+        path.join(process.env.HOME || process.env.USERPROFILE || '', '.qwen', 'tokens.json'),
+    ];
+
+    for (const tokenPath of tokenPaths) {
+        try {
+            if (fs.existsSync(tokenPath)) {
+                const tokens = JSON.parse(fs.readFileSync(tokenPath, 'utf8'));
+                const token = tokens.access_token || tokens.api_key || tokens.token;
+                if (token) {
+                    console.log(C.dim + `  [Found token in ${path.basename(tokenPath)}]` + C.reset);
+                    return token;
+                }
+            }
+        } catch (e) { /* ignore */ }
+    }
     return null;
 };
 
