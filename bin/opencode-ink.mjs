@@ -2558,6 +2558,156 @@ const App = () => {
                     setInput('');
                     return;
 
+                // ═══════════════════════════════════════════════════════════
+                // NEW FEATURES - Session Memory, Skills, Debug
+                // ═══════════════════════════════════════════════════════════
+                case '/remember': {
+                    if (!arg) {
+                        setMessages(prev => [...prev, { role: 'system', content: '❌ Usage: /remember <fact to remember>\nExample: /remember User prefers TypeScript over JavaScript' }]);
+                    } else {
+                        (async () => {
+                            const memory = getSessionMemory();
+                            await memory.load();
+                            await memory.remember(arg);
+                            setMessages(prev => [...prev, { role: 'system', content: `✅ Remembered: "${arg}"\n📝 Fact #${memory.facts.length} saved to session memory.` }]);
+                        })();
+                    }
+                    setInput('');
+                    return;
+                }
+
+                case '/forget': {
+                    if (!arg) {
+                        setMessages(prev => [...prev, { role: 'system', content: '❌ Usage: /forget <number>\nExample: /forget 1' }]);
+                    } else {
+                        (async () => {
+                            const memory = getSessionMemory();
+                            await memory.load();
+                            const index = parseInt(arg, 10);
+                            const removed = await memory.forget(index);
+                            if (removed) {
+                                setMessages(prev => [...prev, { role: 'system', content: `✅ Forgot fact #${index}: "${removed.fact}"` }]);
+                            } else {
+                                setMessages(prev => [...prev, { role: 'system', content: `❌ Fact #${index} not found. Use /memory to see all facts.` }]);
+                            }
+                        })();
+                    }
+                    setInput('');
+                    return;
+                }
+
+                case '/memory': {
+                    (async () => {
+                        const memory = getSessionMemory();
+                        await memory.load();
+                        const facts = memory.getDisplayList();
+                        if (facts.length === 0) {
+                            setMessages(prev => [...prev, { role: 'system', content: '📭 No facts in session memory.\nUse /remember <fact> to add one.' }]);
+                        } else {
+                            const list = facts.map(f => `${f.index}. [${f.category}] ${f.fact} (${f.displayDate})`).join('\n');
+                            setMessages(prev => [...prev, { role: 'system', content: `📝 **Session Memory** (${facts.length} facts)\n\n${list}\n\nUse /forget <number> to remove a fact.` }]);
+                        }
+                    })();
+                    setInput('');
+                    return;
+                }
+
+                case '/clearmemory': {
+                    (async () => {
+                        const memory = getSessionMemory();
+                        await memory.clear();
+                        setMessages(prev => [...prev, { role: 'system', content: '🗑️ Session memory cleared.' }]);
+                    })();
+                    setInput('');
+                    return;
+                }
+
+                case '/skills': {
+                    const display = getSkillListDisplay();
+                    setMessages(prev => [...prev, { role: 'system', content: `🎯 **Available Skills**\n${display}\nUsage: /skill <name> then describe your task` }]);
+                    setInput('');
+                    return;
+                }
+
+                case '/skill': {
+                    if (!arg) {
+                        const skills = getAllSkills();
+                        const names = skills.map(s => s.id).join(', ');
+                        setMessages(prev => [...prev, { role: 'system', content: `❌ Usage: /skill <name>\nAvailable: ${names}` }]);
+                    } else {
+                        const skillName = arg.split(/\s+/)[0];
+                        const skill = getSkill(skillName);
+                        if (!skill) {
+                            const skills = getAllSkills();
+                            const names = skills.map(s => s.id).join(', ');
+                            setMessages(prev => [...prev, { role: 'system', content: `❌ Unknown skill: "${skillName}"\nAvailable: ${names}` }]);
+                        } else {
+                            setMessages(prev => [...prev, { role: 'system', content: `🎯 **Activated: ${skill.name}**\n${skill.description}\n\nNow describe your task and I'll apply this skill.` }]);
+                        }
+                    }
+                    setInput('');
+                    return;
+                }
+
+                case '/debug': {
+                    const nowEnabled = debugLogger.toggle();
+                    setMessages(prev => [...prev, {
+                        role: 'system',
+                        content: nowEnabled
+                            ? `🔧 Debug logging **ENABLED**\nLogs: ${debugLogger.getPath()}`
+                            : '🔧 Debug logging **DISABLED**'
+                    }]);
+                    setInput('');
+                    return;
+                }
+
+                case '/debugclear': {
+                    (async () => {
+                        await debugLogger.clear();
+                        setMessages(prev => [...prev, { role: 'system', content: '🗑️ Debug log cleared.' }]);
+                    })();
+                    setInput('');
+                    return;
+                }
+
+                case '/help': {
+                    setMessages(prev => [...prev, {
+                        role: 'system',
+                        content: `📚 **Available Commands**
+
+**Memory**
+  /remember <fact>  - Save a fact to session memory
+  /memory           - View all remembered facts
+  /forget <#>       - Remove a fact by number
+  /clearmemory      - Clear all memory
+
+**Skills**
+  /skills           - List available skills
+  /skill <name>     - Activate a skill (test, review, docs, etc.)
+
+**Debug**
+  /debug            - Toggle debug logging
+  /debugclear       - Clear debug log
+
+**Settings**
+  /settings         - Open command palette
+  /model            - Change AI model
+  /smartx           - Toggle SmartX auto-healing
+  /auto             - Toggle auto-approve
+  /context          - Toggle smart context
+  /agents           - Multi-agent menu
+
+**Session**
+  /clear            - Clear chat
+  /save <name>      - Save session
+  /load <name>      - Load session
+  /exit             - Exit TUI`
+                    }]);
+                    setInput('');
+                    return;
+                }
+                // ═══════════════════════════════════════════════════════════
+
                 case '/paste':
                     // Read directly from system clipboard (preserves newlines!)
                     try {
