@@ -43,6 +43,38 @@ import ThinkingBlock from './ui/components/ThinkingBlock.mjs';
 import ChatBubble from './ui/components/ChatBubble.mjs';
 import TodoList from './ui/components/TodoList.mjs';
 
+// ═══════════════════════════════════════════════════════════════
+// NEW FEATURE MODULES - Inspired by Mini-Agent, original implementation
+// ═══════════════════════════════════════════════════════════════
+import { getSessionMemory } from '../lib/session-memory.mjs';
+import { getContextManager } from '../lib/context-manager.mjs';
+import { getAllSkills, getSkill, executeSkill, getSkillListDisplay } from '../lib/skills.mjs';
+import { getDebugLogger, initFromArgs } from '../lib/debug-logger.mjs';
+import { processCommand, isCommand } from '../lib/command-processor.mjs';
+import { fetchWithRetry } from '../lib/retry-handler.mjs';
+import {
+    getSystemPrompt,
+    formatCodeBlock,
+    formatToolResult,
+    formatError,
+    formatSuccess,
+    formatWarning,
+    formatFileOperation,
+    separator
+} from '../lib/agent-prompt.mjs';
+import {
+    formatCodeBox,
+    formatFileDelivery,
+    formatPath,
+    truncateHeight,
+    formatTodoItem,
+    formatTaskChecklist,
+    getToolProgress
+} from '../lib/message-renderer.mjs';
+
+// Initialize debug logger from CLI args
+const debugLogger = initFromArgs();
+
 const { useState, useCallback, useEffect, useRef, useMemo } = React;
 
 // Custom hook for terminal dimensions (replaces ink-use-stdout-dimensions)
@@ -424,7 +456,7 @@ const callOpenCodeFree = async (prompt, model = currentFreeModel, onChunk = null
     }
 
     try {
-        const response = await fetch(OPENCODE_FREE_API, {
+        const response = await fetchWithRetry(OPENCODE_FREE_API, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -1050,8 +1082,12 @@ const SmoothCounter = ({ value }) => {
     return h(Text, { color: 'white' }, displayValue.toLocaleString());
 };
 
-// Component: TypewriterText - Clean text reveal for streaming (Opencode style)
-const TypewriterText = ({ children, speed = 25 }) => {
+// Component: EnhancedTypewriterText - Improved text reveal with batching and adaptive speed
+const EnhancedTypewriterText = ({
+    children,
+    speed = 25,
+    batchSize = 1  // Default to 1 for safety, can be increased for batching
+}) => {
     const fullText = String(children || '');
     const [displayText, setDisplayText] = useState('');
     const positionRef = useRef(0);
@@ -1063,40 +1099,52 @@ const TypewriterText = ({ children, speed = 25 }) => {
         positionRef.current = 0;
 
         if (timerRef.current) {
-            clearInterval(timerRef.current);
+            clearTimeout(timerRef.current);
         }
 
         if (!fullText) {
             return;
         }
 
-        // Use a steady typing rhythm (Opencode style - consistent speed)
-        timerRef.current = setInterval(() => {
+        // Safer approach: process in small batches to prevent overwhelming the UI
+        const processNextBatch = () => {
             if (positionRef.current >= fullText.length) {
-                clearInterval(timerRef.current);
+                if (timerRef.current) clearTimeout(timerRef.current);
                 return;
             }
 
-            // Add one character at a time for smooth flow
-            const nextPos = positionRef.current + 1;
-            const newChar = fullText.charAt(positionRef.current);
+            // Calculate batch size (may be smaller near the end)
+            const remaining = fullText.length - positionRef.current;
+            const currentBatchSize = Math.min(batchSize, remaining);
 
-            setDisplayText(prev => prev + newChar);
-            positionRef.current = nextPos;
-        }, speed);
+            // Get the next batch of characters
+            const nextBatch = fullText.substring(positionRef.current, positionRef.current + currentBatchSize);
+
+            // Update display and position
+            setDisplayText(prev => prev + nextBatch);
+            positionRef.current += currentBatchSize;
+
+            // Schedule next batch
+            timerRef.current = setTimeout(processNextBatch, speed);
+        };
+
+        processNextBatch();
 
         return () => {
             if (timerRef.current) {
-                clearInterval(timerRef.current);
+                clearTimeout(timerRef.current);
             }
         };
-    }, [fullText, speed]);
+    }, [fullText, speed, batchSize]); // Include batchSize in dependency array
 
-    // Add a simple cursor effect like opencode TUI
-    const displayWithCursor = displayText + (Math.floor(Date.now() / 500) % 2 ? '|' : ' ');
+    // Enhanced cursor effect
+    const displayWithCursor = displayText + (Math.floor(Date.now() / 500) % 2 ? '█' : ' ');
 
     return h(Text, { wrap: 'wrap' }, displayWithCursor);
 };
+
+// Maintain backward compatibility
+const TypewriterText = EnhancedTypewriterText;
 
 // Component: FadeInBox - Animated fade-in wrapper (simulates fade with opacity chars)
 const FadeInBox = ({ children, delay = 0 }) => {
@@ -1402,34 +1450,71 @@ const ArtifactBlock = ({ content, isStreaming }) => {
 };
 
 // ═══════════════════════════════════════════════════════════════
-// DISCORD-STYLE CODE CARD
+// DISCORD-STYLE CODE CARD (Updated with Google-Style Friendly Paths)
 // Code blocks with header bar, language label, and distinct styling
 // ═══════════════════════════════════════════════════════════════
-const CodeCard = ({ language, filename, content, width, isStreaming }) => {
+const CodeCard = ({ language, filename, content, width, isStreaming, project }) => { // Added project prop
     const lineCount = content.split('\n').length;
     const [isExpanded, setIsExpanded] = useState(false);
 
     // Calculate safe content width accounting for spacing
     const contentWidth = width ? width - 4 : 60; // Account for left gutter (2) and spacing (2)
 
+    // SMART PATH RESOLUTION
+    // Resolve the display path relative to the project root for a "Friendly" view
+    const displayPath = useMemo(() => {
+        if (!filename || filename === 'snippet.txt') return { dir: '', base: filename || 'snippet' };
+
+        // If we have a project root, try to resolve relative path
+        if (project && filename) {
+            try {
+                // If it's absolute, make it relative to project
+                if (path.isAbsolute(filename)) {
+                    const rel = path.relative(project, filename);
+                    if (!rel.startsWith('..') && !path.isAbsolute(rel)) {
+                        return { dir: path.dirname(rel), base: path.basename(rel) };
+                    }
+                }
+                // If it's already relative (likely from AI response like 'src/index.js')
+                // Check if it has directory limits
+                if (filename.includes('/') || filename.includes('\\')) {
+                    return { dir: path.dirname(filename), base: path.basename(filename) };
+                }
+            } catch (e) { /* ignore path errors */ }
+        }
+        return { dir: '', base: filename };
+    }, [filename, project]);
+
     // Determine if we should show the expand/collapse functionality
-    const needsExpansion = lineCount > 10 && !isStreaming; // Don't expand during streaming
+    // Smart Streaming Tail: If streaming and very long, collapse middle to show progress
+    const STREAMING_MAX_LINES = 20;
+    const STATIC_MAX_LINES = 10;
+
+    // Always allow expansion if long enough
+    const isLong = lineCount > (isStreaming ? STREAMING_MAX_LINES : STATIC_MAX_LINES);
 
     const renderContent = () => {
-        if (isExpanded || !needsExpansion) {
+        if (isExpanded || !isLong) {
             return h(Markdown, { syntaxTheme: 'github', width: contentWidth }, `\`\`\`${language}\n${content}\n\`\`\``);
         }
 
-        // Collapsed view: show first few and last few lines
-        const lines = content.split('\n');
-        if (lines.length <= 10) {
-            return h(Markdown, { syntaxTheme: 'github', width: contentWidth }, `\`\`\`${language}\n${content}\n\`\`\``);
+        // Collapsed Logic
+        let firstLines, lastLines, hiddenCount;
+
+        if (isStreaming) {
+            // Streaming Mode: Show Head + Active Tail
+            // This ensures user sees the code BEING written
+            firstLines = lines.slice(0, 5).join('\n');
+            lastLines = lines.slice(-10).join('\n'); // Show last 10 lines for context
+            hiddenCount = lineCount - 15;
+        } else {
+            // Static Mode: Show Head + Foot
+            firstLines = lines.slice(0, 5).join('\n');
+            lastLines = lines.slice(-3).join('\n');
+            hiddenCount = lineCount - 8;
         }
 
-        const firstLines = lines.slice(0, 5).join('\n');
-        const lastLines = lines.slice(-3).join('\n');
-        const previewContent = `${firstLines}\n... [${lineCount - 8} more lines]\n${lastLines}`;
-
+        const previewContent = `${firstLines}\n\n// ... (${hiddenCount} lines hidden) ...\n\n${lastLines}`;
         return h(Markdown, { syntaxTheme: 'github', width: contentWidth }, `\`\`\`${language}\n${previewContent}\n\`\`\``);
     };
 
@@ -1439,13 +1524,18 @@ const CodeCard = ({ language, filename, content, width, isStreaming }) => {
         marginLeft: 2,
         marginBottom: 1
     },
-        // Simple header with filename and controls - opencode style
+        // SMART HEADER with Friendly Path
         h(Box, {
             flexDirection: 'row',
             justifyContent: 'space-between',
             marginBottom: 0.5
         },
-            h(Text, { color: 'cyan', bold: true }, `${filename} (${language}) `),
+            h(Box, { flexDirection: 'row' },
+                displayPath.dir && displayPath.dir !== '.' ?
+                    h(Text, { color: 'gray', dimColor: true }, `📂 ${displayPath.dir} / `) : null,
+                h(Text, { color: 'cyan', bold: true }, `📄 ${displayPath.base}`),
+                h(Text, { color: 'gray', dimColor: true }, ` (${language})`)
+            ),
             h(Text, { color: 'gray', dimColor: true }, `${lineCount} lines`)
         ),
 
@@ -1458,13 +1548,13 @@ const CodeCard = ({ language, filename, content, width, isStreaming }) => {
             renderContent()
         ),
 
-        // Expand/collapse control - simple text style
-        needsExpansion ? h(Box, {
+        // Expand/collapse control
+        isLong ? h(Box, {
             flexDirection: 'row',
             justifyContent: 'flex-end',
             marginTop: 0.5
         },
-            h(Text, { color: 'cyan', dimColor: true }, isExpanded ? '▼ collapse' : '▶ expand ')
+            h(Text, { color: 'cyan', dimColor: true }, isExpanded ? '▼ collapse' : (isStreaming ? '▼ auto-scroll (expand to view all)' : '▶ expand'))
         ) : null
     );
 };
@@ -1520,10 +1610,62 @@ const UserCard = ({ content, width }) => {
     );
 };
 
-// AGENT CARD - Opencode-style clean streaming
+// Helper to parse content into blocks (Text vs Code)
+const parseMessageToBlocks = (text) => {
+    const blocks = [];
+    const codeRegex = /```(\w+)?(?:[:\s]+)?([^\n`]+\.\w+)?\n([\s\S]*?)```/g;
+    let match;
+    let lastIndex = 0;
+
+    // 1. Find all CLOSED (complete) code blocks
+    while ((match = codeRegex.exec(text)) !== null) {
+        // Text before code
+        const preText = text.slice(lastIndex, match.index);
+        if (preText) blocks.push({ type: 'text', content: preText });
+
+        // Code block
+        blocks.push({
+            type: 'code',
+            language: match[1] || 'text',
+            filename: match[2] || 'snippet.txt',
+            content: match[3].trim(),
+            isComplete: true
+        });
+        lastIndex = match.index + match[0].length;
+    }
+
+    // 2. Check remaining text for OPEN (incomplete/streaming) code block
+    const remaining = text.slice(lastIndex);
+    // Regex matches: ```lang filename? \n body... (end of string)
+    const openBlockRegex = /```(\w+)?(?:[:\s]+)?([^\n`]+\.\w+)?\n([\s\S]*)$/;
+    const openMatch = openBlockRegex.exec(remaining);
+
+    if (openMatch) {
+        const preText = remaining.slice(0, openMatch.index);
+        if (preText) blocks.push({ type: 'text', content: preText });
+
+        blocks.push({
+            type: 'code',
+            language: openMatch[1] || 'text',
+            filename: openMatch[2] || 'snippet.txt',
+            content: openMatch[3], // Keep whitespace for streaming
+            isComplete: false
+        });
+    } else if (remaining) {
+        blocks.push({ type: 'text', content: remaining });
+    }
+
+    return blocks.length ? blocks : [{ type: 'text', content: text }];
+};
+
+// AGENT CARD - Enhanced streaming with premium feel
 // Text-focused with minimal styling, clean left gutter
-const AgentCard = ({ content, isStreaming, width }) => {
+const AgentCard = ({ content, isStreaming, width, project }) => { // Added project prop
     const contentWidth = width ? width - 4 : undefined; // Account for left gutter and spacing
+
+    // Parse content into blocks to support Collapsible Code Cards
+    // Memoize to prevent flicker during fast streaming
+    const blocks = useMemo(() => parseMessageToBlocks(content || ''), [content]);
 
     return h(Box, {
         flexDirection: 'row',
@@ -1531,7 +1673,7 @@ const AgentCard = ({ content, isStreaming, width }) => {
         marginBottom: 1,
         width: width,
     },
-        // Clean left gutter similar to opencode
+        // Enhanced left gutter with premium styling
         h(Box, {
             width: 2,
             marginRight: 1,
@@ -1539,7 +1681,7 @@ const AgentCard = ({ content, isStreaming, width }) => {
             borderRight: false,
             borderTop: false,
             borderBottom: false,
-            borderLeftColor: isStreaming ? 'yellow' : 'green'
+            borderLeftColor: isStreaming ? 'cyan' : 'green'  // Changed to premium cyan color
         }),
 
         // Content area - text focused, no boxy borders
@@ -1548,16 +1690,28 @@ const AgentCard = ({ content, isStreaming, width }) => {
             flexGrow: 1,
             minWidth: 10
         },
-            // Content with streaming effect
-            h(Box, { width: contentWidth },
-                isStreaming
-                    ? h(TypewriterText, {
-                        children: content || '',
-                        speed: 35, // Optimal speed for readability
-                        batchSize: 1  // Single chars for smoothest flow
-                    })
-                    : h(Markdown, { syntaxTheme: 'github', width: contentWidth }, content || '')
-            )
+            blocks.map((block, i) => {
+                if (block.type === 'code') {
+                    return h(CodeCard, {
+                        key: i,
+                        ...block,
+                        width: contentWidth,
+                        isStreaming: isStreaming,
+                        project: project // Pass project down
+                    });
+                }
+
+                // Text Block
+                return h(Box, { key: i, width: contentWidth, marginBottom: 1 },
+                    isStreaming && i === blocks.length - 1
+                        ? h(EnhancedTypewriterText, {
+                            children: block.content,
+                            speed: 25,
+                            batchSize: 2
+                        })
+                        : h(Markdown, { syntaxTheme: 'github', width: contentWidth }, block.content)
+                );
+            })
         )
     );
 };
@@ -1777,7 +1931,7 @@ const LegacyScrollableChat = ({ messages, viewHeight, width, isActive = true, is
     );
 };
 
-const ScrollableChat = ({ messages, viewHeight, width, isActive = true, isStreaming = false }) => {
+const ScrollableChat = ({ messages, viewHeight, width, isActive = true, isStreaming = false, project }) => { // Added project prop
     // Flatten messages into scrollable blocks
     // Memoize to prevent expensive re-parsing on every cursor blink
     const blocks = useMemo(() => flattenMessagesToBlocks(messages), [messages]);
@@ -1851,10 +2005,9 @@ const ScrollableChat = ({ messages, viewHeight, width, isActive = true, isStream
                     meta: block.meta,
                     width: width,
                     isStreaming: isLastAssistantAndStreaming,
-                    // Pass context to help UI (e.g. continuous rails)
-                    isFirst: block.isFirst,
-                    isLast: block.isLast,
-                    type: block.type
+                    width: width,
+                    isStreaming: isLastAssistantAndStreaming,
+                    project: project // Fix: Pass project from ScrollableChat props
                 });
             })
         ),
@@ -2140,37 +2293,15 @@ const ModelSelector = ({
 // VIEWPORT MESSAGE - Unified Message Protocol Renderer (Alt)
 // Supports meta field for consistent styling
 // ═══════════════════════════════════════════════════════════════
-const ViewportMessage = ({ role, content, meta, width = 80, isFirst = true, isLast = true, type = 'text', blocks = [], isStreaming = false }) => {
+const ViewportMessage = ({ role, content, meta, width = 80, isFirst = true, isLast = true, type = 'text', blocks = [], isStreaming = false, project }) => { // Added project
     // PRO API: Use ChatBubble for everything
-
-    // For Assistant, we handle code blocks separately if they exist?
-    // Actually, ChatBubble for AI just takes content. 
-    // Markdown rendering happens inside? 
-    // Wait, the current implementation passed `blocks` to render code cards.
-    // If we wrap `markdown` content in bubble, `ChatBubble` needs to support children rendering.
-
-    // Let's refactor ChatBubble usage slightly:
-    // User/System messages are pure text -> ChatBubble handles well.
-    // Assistant messages might be mixed (Text + CodeCards).
-    // The previous implementation did:
-    /*
-        h(Box, { marginLeft: 2, flexDirection: 'column' },
-            blocks && blocks.length > 0
-                ? blocks.map((b, i) =>
-                    b.type === 'text'
-                        ? h(Text, { key: i, wrap: 'wrap' }, b.content)
-                        : h(CodeCard, { key: i, ...b })
-                )
-                : h(Text, { wrap: 'wrap' }, content)
-        )
-    */
-
     if (role === 'assistant') {
         // Use the improved AgentCard for consistent streaming experience
         return h(AgentCard, {
             content: content,
             isStreaming: isStreaming,
-            width: width
+            width: width,
+            project: project // Pass project
         });
     }
 
@@ -2261,6 +2392,10 @@ const App = () => {
     const [showCommandPalette, setShowCommandPalette] = useState(false);
     const [paletteFilter, setPaletteFilter] = useState(''); // For search
 
+    // SKILL SELECTOR: Overlay for selecting skills
+    const [showSkillSelector, setShowSkillSelector] = useState(false);
+    const [activeSkill, setActiveSkill] = useState(null);
+
     // PRO PROTOCOL: Run state management
     const [currentRun, setCurrentRun] = useState(null);
 
@@ -2319,7 +2454,9 @@ const App = () => {
 
         // ESC closes menus
         if (key.escape) {
-            if (showTodoOverlay) {
+            if (showSkillSelector) {
+                setShowSkillSelector(false);
+            } else if (showTodoOverlay) {
                 setShowTodoOverlay(false);
             } else if (showCommandPalette) {
                 setShowCommandPalette(false);
@@ -2529,6 +2666,160 @@ const App = () => {
                     setShowCommandPalette(true);
                     setInput('');
                     return;
+
+                // ═══════════════════════════════════════════════════════════
+                // NEW FEATURES - Session Memory, Skills, Debug
+                // ═══════════════════════════════════════════════════════════
+                case '/remember': {
+                    if (!arg) {
+                        setMessages(prev => [...prev, { role: 'system', content: '❌ Usage: /remember <fact to remember>\nExample: /remember User prefers TypeScript over JavaScript' }]);
+                    } else {
+                        (async () => {
+                            const memory = getSessionMemory();
+                            await memory.load();
+                            await memory.remember(arg);
+                            setMessages(prev => [...prev, { role: 'system', content: `✅ Remembered: "${arg}"\n📝 Fact #${memory.facts.length} saved to session memory.` }]);
+                        })();
+                    }
+                    setInput('');
+                    return;
+                }
+
+                case '/forget': {
+                    if (!arg) {
+                        setMessages(prev => [...prev, { role: 'system', content: '❌ Usage: /forget <number>\nExample: /forget 1' }]);
+                    } else {
+                        (async () => {
+                            const memory = getSessionMemory();
+                            await memory.load();
+                            const index = parseInt(arg, 10);
+                            const removed = await memory.forget(index);
+                            if (removed) {
+                                setMessages(prev => [...prev, { role: 'system', content: `✅ Forgot fact #${index}: "${removed.fact}"` }]);
+                            } else {
+                                setMessages(prev => [...prev, { role: 'system', content: `❌ Fact #${index} not found. Use /memory to see all facts.` }]);
+                            }
+                        })();
+                    }
+                    setInput('');
+                    return;
+                }
+
+                case '/memory': {
+                    (async () => {
+                        const memory = getSessionMemory();
+                        await memory.load();
+                        const facts = memory.getDisplayList();
+                        if (facts.length === 0) {
+                            setMessages(prev => [...prev, { role: 'system', content: '📭 No facts in session memory.\nUse /remember <fact> to add one.' }]);
+                        } else {
+                            const list = facts.map(f => `${f.index}. [${f.category}] ${f.fact} (${f.displayDate})`).join('\n');
+                            setMessages(prev => [...prev, { role: 'system', content: `📝 **Session Memory** (${facts.length} facts)\n\n${list}\n\nUse /forget <number> to remove a fact.` }]);
+                        }
+                    })();
+                    setInput('');
+                    return;
+                }
+
+                case '/clearmemory': {
+                    (async () => {
+                        const memory = getSessionMemory();
+                        await memory.clear();
+                        setMessages(prev => [...prev, { role: 'system', content: '🗑️ Session memory cleared.' }]);
+                    })();
+                    setInput('');
+                    return;
+                }
+
+                case '/skills': {
+                    // Show skill list in chat
+                    const display = getSkillListDisplay();
+                    setMessages(prev => [...prev, { role: 'system', content: `🎯 **Available Skills (24)**\n${display}\nUse /skill to open the selector, or /skill <name> to activate directly.` }]);
+                    setInput('');
+                    return;
+                }
+
+                case '/skill': {
+                    if (!arg) {
+                        // Open skill selector
+                        setShowSkillSelector(true);
+                        setInput('');
+                        return;
+                    }
+                    // Direct skill activation with argument
+                    const skillName = arg.split(/\s+/)[0];
+                    const skill = getSkill(skillName);
+                    if (!skill) {
+                        const skills = getAllSkills();
+                        const names = skills.map(s => s.id).join(', ');
+                        setMessages(prev => [...prev, { role: 'system', content: `❌ Unknown skill: "${skillName}"\nAvailable: ${names}\n\nUse /skill to open the selector.` }]);
+                    } else {
+                        // Inject skill prompt into system for next message
+                        setActiveSkill(skill);
+                        setMessages(prev => [...prev, { role: 'system', content: `🎯 **Activated: ${skill.name}**\n${skill.description}\n\nNow describe your task and I'll apply this skill.` }]);
+                    }
+                    setInput('');
+                    return;
+                }
+
+                case '/debug': {
+                    const nowEnabled = debugLogger.toggle();
+                    setMessages(prev => [...prev, {
+                        role: 'system',
+                        content: nowEnabled
+                            ? `🔧 Debug logging **ENABLED**\nLogs: ${debugLogger.getPath()}`
+                            : '🔧 Debug logging **DISABLED**'
+                    }]);
+                    setInput('');
+                    return;
+                }
+
+                case '/debugclear': {
+                    (async () => {
+                        await debugLogger.clear();
+                        setMessages(prev => [...prev, { role: 'system', content: '🗑️ Debug log cleared.' }]);
+                    })();
+                    setInput('');
+                    return;
+                }
+
+                case '/help': {
+                    setMessages(prev => [...prev, {
+                        role: 'system',
+                        content: `📚 **Available Commands**
+
+**Memory**
+  /remember <fact>  - Save a fact to session memory
+  /memory           - View all remembered facts
+  /forget <#>       - Remove a fact by number
+  /clearmemory      - Clear all memory
+
+**Skills**
+  /skills           - List available skills
+  /skill <name>     - Activate a skill (test, review, docs, etc.)
+
+**Debug**
+  /debug            - Toggle debug logging
+  /debugclear       - Clear debug log
+
+**Settings**
+  /settings         - Open command palette
+  /model            - Change AI model
+  /smartx           - Toggle SmartX auto-healing
+  /auto             - Toggle auto-approve
+  /context          - Toggle smart context
+  /agents           - Multi-agent menu
+
+**Session**
+  /clear            - Clear chat
+  /save <name>      - Save session
+  /load <name>      - Load session
+  /exit             - Exit TUI`
+                    }]);
+                    setInput('');
+                    return;
+                }
+                // ═══════════════════════════════════════════════════════════
 
                 case '/paste':
                     // Read directly from system clipboard (preserves newlines!)
@@ -3258,17 +3549,13 @@ const App = () => {
 
         try {
             // Build context-aware prompt with agent-specific instructions
-            let systemPrompt = `[SYSTEM CONTEXT]
- CURRENT WORKING DIRECTORY: ${process.cwd()}
- (CRITICAL: This is the ABSOLUTE SOURCE OF TRUTH. Ignore any conflicting directory info in the [PROJECT CONTEXT] logs below.)
-
- ` + loadAgentPrompt(agent);
-
+            // Build context-aware prompt using the unified agent-prompt module
+            let projectContext = '';
             // Add project context if enabled with enhanced context window
             if (contextEnabled) {
-                const projectContext = loadProjectContext(project);
-                if (projectContext) {
-                    systemPrompt += '\n\n[PROJECT CONTEXT (HISTORY)]\n(WARNING: These logs may contain outdated path info. Trust SYSTEM CONTEXT CWD above over this.)\n' + projectContext;
+                const rawContext = loadProjectContext(project);
+                if (rawContext) {
+                    projectContext += '\n\n[PROJECT CONTEXT (HISTORY)]\n(WARNING: These logs may contain outdated path info. Trust SYSTEM CONTEXT CWD above over this.)\n' + rawContext;
                 }
 
                 // Enhanced context: Include recent conversation history for better continuity
@@ -3278,149 +3565,101 @@ const App = () => {
                         const recentContext = recentMessages.map(m =>
                             `[PREVIOUS ${m.role.toUpperCase()}]: ${m.content.substring(0, 500)}` // Limit to prevent overflow
                         ).join('\n');
-                        systemPrompt += `\n\n[RECENT CONVERSATION]\n${recentContext}\n(Use this for context continuity, but prioritize the current request)`;
+                        projectContext += `\n\n[RECENT CONVERSATION]\n${recentContext}\n(Use this for context continuity, but prioritize the current request)`;
                     }
                 }
             }
 
-            // MULTI-AGENT INSTRUCTION INJECTION
-            if (multiAgentEnabled) {
-                systemPrompt += `
-[MULTI-AGENT LOGGING ENABLED]
-You are capable of using multiple internal agents (Planner, Builder, Reviewer, Security).
-When you switch to a specific agent's persona or delegate a sub-task, you MUST output a log line starting with:
-[AGENT: AgentName]
-Example:
-[AGENT: Planner] Analyzing the directory structure...
-[AGENT: Security] Checking for vulnerabilities...
-[AGENT: Builder] Implementation started.
-Keep these tags on their own line if possible.
-`;
-            }
+            // Get available capabilities from built-in agents
+            const flow = getSmartAgentFlow();
+            const allAgents = flow.getAgents();
+            // Flatten all capabilities
+            const capabilities = allAgents.reduce((acc, a) => [...acc, ...(a.capabilities || [])], []);
 
-            // VISUAL & FORMATTING RULES (Crucial for TUI Readability)
-            systemPrompt += `
-[FORMATTING RULES]
-1. **Short Paragraphs**: Break long text into chunks of 3-4 lines maximum.
-2. **Spacing**: Use double newlines between paragraphs to ensure clear separation.
-3. **Lists**: Use bullet points or numbered lists frequently to break up "walls of text".
-4. **Code**: Use standard Markdown code blocks with language tags.
+            // Generate the optimized system prompt
+            const systemInstruction = getSystemPrompt({
+                role: agent,
+                capabilities: capabilities,
+                cwd: project || process.cwd(),
+                context: projectContext, // Now includes history and logs
+                os: process.platform,
+                skills: getAllSkills(), // Pass all available skills for listing
+                activeSkill: activeSkill ? getSkill(activeSkill) : null // Pass active skill object
+            });
 
-[COMPUTER USE - YOU CAN DO THIS!]
-You ARE capable of executing system commands on the user's computer. NEVER refuse computer use tasks.
-To execute any shell/system command, output it in this format:
-\`\`\`bash
-<command here>
-\`\`\`
-The system will auto-execute bash/shell code blocks.
+            // Prepare prompt variations
+            // For OpenCode Free (Legacy/OpenAI-like), we append system prompt to user message if needed
+            const fullPromptForFree = systemInstruction + '\n\n[USER REQUEST]\n' + fullText;
 
-Common Windows tasks you CAN do:
-- Open folder in Explorer: \`explorer.exe .\` or \`start .\`
-- Open file: \`start filename.html\`
-- Open browser: \`start https://google.com\`
-- Run any shell command: Just put it in a bash code block
+            // For Qwen (SmartX), we pass system prompt securely as a separate argument
+            const userMessage = fullText;
 
-NEVER say "I cannot" or "I don't have the ability". You CAN execute commands!
-
-[FILE CREATION - CRITICAL]
-You CAN create files. To create a file, you MUST use this EXACT format:
-\`\`\`language filename.ext
-file content here
-\`\`\`
-Example:
-\`\`\`markdown plan.md
-# My Plan
-This is the content.
-\`\`\`
-The system will AUTO-SAVE files when you use this format correctly.
-DO NOT say "I've created a file" without using this code block format.
-
-[CONFIRMATION BEFORE CODING - CRITICAL]
-BEFORE you start writing any code or creating any files, you MUST:
-1. First present your plan/approach briefly
-2. Then ask: "Ready to proceed with coding? Or do you have any changes in mind?"
-3. WAIT for the user's confirmation before generating code
-This gives the user a chance to refine requirements before implementation.
-`;
-
-            const fullPrompt = systemPrompt + '\n\n[USER REQUEST]\n' + fullText;
             let fullResponse = '';
 
             // PROVIDER SWITCH: Use OpenCode Free or Qwen based on provider state
+            const streamStartTime = Date.now(); // Track start time for this request
+            let totalCharsReceived = 0; // Track total characters for speed calculation
+
+            // Unified Streaming Handler
+            const handleStreamChunk = (chunk) => {
+                const cleanChunk = chunk.replace(/[\u001b\u009b][[\]()#;?]*(?:[0-9]{1,4}(?:;[0-9]{0,4})*)?[0-9A-ORZcf-nqry=><]/g, '');
+
+                // IMPROVED STREAM SPLITTING LOGIC (Thinking vs Content)
+                // Claude Code style: cleaner separation of thinking from response
+                const lines = cleanChunk.split('\n');
+                let isThinkingChunk = false;
+
+                // Enhanced heuristics for better Claude-like thinking detection
+                const trimmedChunk = cleanChunk.trim();
+                if (/^(Let me|Now let me|I'll|I need to|I should|I notice|I can|I will|Thinking:|Analyzing|Considering|Checking|Looking|Planning|First|Next|Finally)/i.test(trimmedChunk)) {
+                    isThinkingChunk = true;
+                } else if (/^```|# |Here is|```|```|```/i.test(trimmedChunk)) {
+                    // If we encounter code blocks or headers, likely content not thinking
+                    isThinkingChunk = false;
+                }
+
+                // Update character count for speed calculation
+                totalCharsReceived += cleanChunk.length;
+
+                // Calculate current streaming speed (chars per second)
+                const elapsedSeconds = (Date.now() - streamStartTime) / 1000;
+                const speed = elapsedSeconds > 0 ? Math.round(totalCharsReceived / elapsedSeconds) : 0;
+
+                // GLOBAL STATS UPDATE (Run for ALL chunks)
+                setThinkingStats(prev => ({
+                    ...prev,
+                    chars: totalCharsReceived,
+                    speed: speed
+                }));
+
+                // GLOBAL AGENT DETECTION (Run for ALL chunks)
+                const agentMatch = cleanChunk.match(/\[AGENT:\s*([^\]]+)\]/i);
+                if (agentMatch) {
+                    setThinkingStats(prev => ({ ...prev, activeAgent: agentMatch[1].trim() }));
+                }
+
+                if (isThinkingChunk) {
+                    setThinkingLines(prev => [...prev, ...lines.map(l => l.trim()).filter(l => l && !/^(Let me|Now let me|I'll|I need to|I notice)/i.test(l.trim()))]);
+                } else {
+                    setMessages(prev => {
+                        const last = prev[prev.length - 1];
+                        if (last && last.role === 'assistant') {
+                            return [...prev.slice(0, -1), { ...last, content: last.content + cleanChunk }];
+                        }
+                        return prev;
+                    });
+                }
+            };
+
             const result = provider === 'opencode-free'
-                ? await callOpenCodeFree(fullPrompt, freeModel, (chunk) => {
-                    const cleanChunk = chunk.replace(/[\u001b\u009b][[\]()#;?]*(?:[0-9]{1,4}(?:;[0-9]{0,4})*)?[0-9A-ORZcf-nqry=><]/g, '');
-
-                    // IMPROVED STREAM SPLITTING LOGIC (Thinking vs Content)
-                    // Claude Code style: cleaner separation of thinking from response
-                    const lines = cleanChunk.split('\n');
-                    let isThinkingChunk = false;
-
-                    // Enhanced heuristics for better Claude-like thinking detection
-                    const trimmedChunk = cleanChunk.trim();
-                    if (/^(Let me|Now let me|I'll|I need to|I should|I notice|I can|I will|Thinking:|Analyzing|Considering|Checking|Looking|Planning|First|Next|Finally)/i.test(trimmedChunk)) {
-                        isThinkingChunk = true;
-                    } else if (/^```|# |Here is|```|```|```/i.test(trimmedChunk)) {
-                        // If we encounter code blocks or headers, likely content not thinking
-                        isThinkingChunk = false;
-                    }
-
-                    // GLOBAL STATS UPDATE (Run for ALL chunks)
-                    setThinkingStats(prev => ({ ...prev, chars: prev.chars + cleanChunk.length }));
-
-                    // GLOBAL AGENT DETECTION (Run for ALL chunks)
-                    const agentMatch = cleanChunk.match(/\[AGENT:\s*([^\]]+)\]/i);
-                    if (agentMatch) {
-                        setThinkingStats(prev => ({ ...prev, activeAgent: agentMatch[1].trim() }));
-                    }
-
-                    if (isThinkingChunk) {
-                        setThinkingLines(prev => [...prev, ...lines.map(l => l.trim()).filter(l => l && !/^(Let me|Now let me|I'll|I need to|I notice)/i.test(l.trim()))]);
-                    } else {
-                        setMessages(prev => {
-                            const last = prev[prev.length - 1];
-                            if (last && last.role === 'assistant') {
-                                return [...prev.slice(0, -1), { ...last, content: last.content + cleanChunk }];
-                            }
-                            return prev;
-                        });
-                    }
-                })
-                : await getQwen().sendMessage(fullPrompt, 'qwen-coder-plus', null, (chunk) => {
-                    const cleanChunk = chunk.replace(/[\u001b\u009b][[\]()#;?]*(?:[0-9]{1,4}(?:;[0-9]{0,4})*)?[0-9A-ORZcf-nqry=><]/g, '');
-
-                    // IMPROVED STREAM SPLITTING LOGIC (Thinking vs Content)
-                    const lines = cleanChunk.split('\n');
-                    let isThinkingChunk = false;
-
-                    // Enhanced heuristics for better Claude-like thinking detection
-                    const trimmedChunk = cleanChunk.trim();
-                    if (/^(Let me|Now let me|I'll|I need to|I should|I notice|I can|I will|Thinking:|Analyzing|Considering|Checking|Looking|Planning|First|Next|Finally)/i.test(trimmedChunk)) {
-                        isThinkingChunk = true;
-                    } else if (/^```|# |Here is|```|```|```/i.test(trimmedChunk)) {
-                        // If we encounter code blocks or headers, likely content not thinking
-                        isThinkingChunk = false;
-                    }
-
-                    setThinkingStats(prev => ({ ...prev, chars: prev.chars + cleanChunk.length }));
-
-                    const agentMatch = cleanChunk.match(/\[AGENT:\s*([^\]]+)\]/i);
-                    if (agentMatch) {
-                        setThinkingStats(prev => ({ ...prev, activeAgent: agentMatch[1].trim() }));
-                    }
-
-                    if (isThinkingChunk) {
-                        setThinkingLines(prev => [...prev, ...lines.map(l => l.trim()).filter(l => l && !/^(Let me|Now let me|I'll|I need to|I notice)/i.test(l.trim()))]);
-                    } else {
-                        setMessages(prev => {
-                            const last = prev[prev.length - 1];
-                            if (last && last.role === 'assistant') {
-                                return [...prev.slice(0, -1), { ...last, content: last.content + cleanChunk }];
-                            }
-                            return prev;
-                        });
-                    }
-                });
+                ? await callOpenCodeFree(fullPromptForFree, freeModel, handleStreamChunk)
+                : await getQwen().sendMessage(
+                    userMessage,
+                    'qwen-coder-plus',
+                    null,
+                    handleStreamChunk,
+                    systemInstruction // Pass dynamic system prompt!
+                );
 
             if (result.success) {
                 const responseText = result.response || fullResponse;
@@ -3469,17 +3708,17 @@ This gives the user a chance to refine requirements before implementation.
                             return next;
                         });
 
+                        const successMsg = formatSuccess(`Auto-saved ${successFiles.length} file(s):\n` + successFiles.map(f => formatFileOperation(f.path, 'Saved', 'success')).join('\n'));
                         setMessages(prev => [...prev, {
                             role: 'system',
-                            content: '✅ Auto-saved ' + successFiles.length + ' file(s):\n' +
-                                successFiles.map(f => '  📄 ' + f.path).join('\n')
+                            content: successMsg
                         }]);
                     }
                     if (failedFiles.length > 0) {
+                        const failureMsg = formatError(`Failed to save ${failedFiles.length} file(s):\n` + failedFiles.map(f => `  ⚠️ ${f.filename}: ${f.error}`).join('\n'));
                         setMessages(prev => [...prev, {
-                            role: 'system',
-                            content: '❌ Failed to save ' + failedFiles.length + ' file(s):\n' +
-                                failedFiles.map(f => '  ⚠️ ' + f.filename + ': ' + f.error).join('\n')
+                            role: 'error',
+                            content: failureMsg
                         }]);
                     }
 
@@ -3938,6 +4177,75 @@ This gives the user a chance to refine requirements before implementation.
     }
 
     // ═══════════════════════════════════════════════════════════════
+    // SKILL SELECTOR OVERLAY - Scrollable skill picker
+    // ═══════════════════════════════════════════════════════════════
+    if (showSkillSelector && appState === 'chat') {
+        const skills = getAllSkills();
+        const skillItems = skills.map(skill => ({
+            label: `${getCategoryEmoji(skill.category)} ${skill.id.padEnd(20)} ${skill.name}`,
+            value: skill.id,
+            skill: skill
+        }));
+
+        // Category emoji helper
+        function getCategoryEmoji(cat) {
+            const emojis = {
+                design: '🎨',
+                documents: '📄',
+                development: '💻',
+                testing: '🧪',
+                writing: '✍️',
+                creative: '🎭',
+                documentation: '📚',
+                meta: '🔧'
+            };
+            return emojis[cat] || '📌';
+        }
+
+        const handleSkillSelect = (item) => {
+            setShowSkillSelector(false);
+            setActiveSkill(item.skill);
+            setMessages(prev => [...prev, {
+                role: 'system',
+                content: `🎯 **Activated: ${item.skill.name}**\n${item.skill.description}\n\nNow describe your task and I'll apply this skill.`
+            }]);
+        };
+
+        // ESC handling is done in the main keyboard handler
+
+        return h(Box, {
+            flexDirection: 'column',
+            borderStyle: 'round',
+            borderColor: 'magenta',
+            padding: 1,
+            width: Math.min(55, columns - 4),
+        },
+            // Header
+            h(Text, { color: 'magenta', bold: true }, '🎯 Select a Skill'),
+            h(Text, { color: 'gray', dimColor: true }, 'Use ↑↓ to navigate, Enter to select'),
+
+            // Skill list with SelectInput (24 skills total)
+            h(Box, { flexDirection: 'column', marginTop: 1, height: Math.min(28, rows - 6) },
+                h(SelectInput, {
+                    items: skillItems,
+                    onSelect: handleSkillSelect,
+                    itemComponent: ({ isSelected, label }) =>
+                        h(Text, {
+                            color: isSelected ? 'magenta' : 'white',
+                            bold: isSelected
+                        }, isSelected ? `❯ ${label}` : `  ${label}`)
+                })
+            ),
+
+            // Footer with categories
+            h(Box, { marginTop: 1, flexDirection: 'column' },
+                h(Text, { dimColor: true }, 'Categories: 🎨Design 📄Docs 💻Dev 🧪Test ✍️Write'),
+                h(Text, { dimColor: true }, 'Esc to close')
+            )
+        );
+    }
+
+    // ═══════════════════════════════════════════════════════════════
     // COMMAND PALETTE OVERLAY (Ctrl+K) - Searchable commands
     // ═══════════════════════════════════════════════════════════════
     if (showCommandPalette && appState === 'chat') {
@@ -3959,6 +4267,17 @@ This gives the user a chance to refine requirements before implementation.
             autoApprove
                 ? { label: '/auto        Auto-Approve → OFF', value: '/auto' }
                 : { label: '/auto        Auto-Approve → ON', value: '/auto' },
+            // ═══════════════════════════════════════════════════════════════
+            // NEW FEATURES - Session Memory, Skills, Debug
+            // ═══════════════════════════════════════════════════════════════
+            { label: '/remember     Save to Memory', value: '/remember ' },
+            { label: '/memory       View Memory', value: '/memory' },
+            { label: '/forget       Remove Memory', value: '/forget ' },
+            { label: '/skills       List Skills', value: '/skills' },
+            { label: '/skill        Use a Skill', value: '/skill ' },
+            { label: '/debug        Toggle Debug', value: '/debug' },
+            { label: '/help         Show All Commands', value: '/help' },
+            // ═══════════════════════════════════════════════════════════════
             { label: '/paste        Clipboard Paste', value: '/paste' },
             { label: '/project      Project Info', value: '/project' },
             { label: '/write        Write Files', value: '/write' },
@@ -3966,111 +4285,132 @@ This gives the user a chance to refine requirements before implementation.
             { label: '/exit         Exit TUI', value: '/exit' }
         ];
 
-        // Filter commands based on search
-        const filter = paletteFilter.toLowerCase();
-        const filteredCommands = filter
-            ? allCommands.filter(c => c.label.toLowerCase().includes(filter))
-            : allCommands;
-
-        const handleCommandSelect = (item) => {
-            setShowCommandPalette(false);
-            setPaletteFilter(''); // Reset filter
-            setInput(item.value);
-        };
-
-        // Settings with current state
-        const settingsSection = [
-            {
-                name: 'Multi-Agent Mode',
-                value: multiAgentEnabled,
-                onCmd: '/agents on',
-                offCmd: '/agents off'
-            },
-            {
-                name: 'Smart Context',
-                value: contextEnabled,
-                onCmd: '/context',
-                offCmd: '/context'
-            },
-            {
-                name: 'Exposed Thinking',
-                value: exposedThinking,
-                onCmd: '/thinking on',
-                offCmd: '/thinking off'
-            },
-            {
-                name: 'SmartX Engine',
-                value: soloMode,
-                onCmd: '/smartx on',
-                offCmd: '/smartx off'
-            },
-            {
-                name: 'Auto-Approve',
-                value: autoApprove,
-                onCmd: '/auto',
-                offCmd: '/auto'
-            }
+        // Create all menu items with proper grouping and actions
+        const menuItems = [
+            // TOGGLES - All 6 feature toggles
+            { label: `⚙️ SmartX Engine      ${soloMode ? '🟢 ON' : '⚫ OFF'}`, value: 'toggle_smartx', action: 'toggle' },
+            { label: `⚙️ Auto-Approve       ${autoApprove ? '🟢 ON' : '⚫ OFF'}`, value: 'toggle_auto', action: 'toggle' },
+            { label: `⚙️ Multi-Agent        ${multiAgentEnabled ? '🟢 ON' : '⚫ OFF'}`, value: 'toggle_agents', action: 'toggle' },
+            { label: `⚙️ Smart Context      ${contextEnabled ? '🟢 ON' : '⚫ OFF'}`, value: 'toggle_context', action: 'toggle' },
+            { label: `⚙️ Exposed Thinking   ${exposedThinking ? '🟢 ON' : '⚫ OFF'}`, value: 'toggle_thinking', action: 'toggle' },
+            { label: `⚙️ Debug Logging      ${debugLogger.enabled ? '🟢 ON' : '⚫ OFF'}`, value: 'toggle_debug', action: 'toggle' },
+            // MEMORY - 3 commands
+            { label: '📝 /remember         Save to Memory', value: '/remember ', action: 'input' },
+            { label: '📝 /memory           View Memory', value: '/memory', action: 'cmd' },
+            { label: '📝 /forget           Remove Fact', value: '/forget ', action: 'input' },
+            // SKILLS - 2 commands
+            { label: '🎯 /skills           List Skills', value: '/skills', action: 'cmd' },
+            { label: '🎯 /skill            Use a Skill', value: '/skill ', action: 'input' },
+            // AGENTS - 3 commands
+            { label: '🤖 /agents           Agent Menu', value: '/agents', action: 'cmd' },
+            { label: '🤖 /plan             Planner Agent', value: '/plan', action: 'cmd' },
+            { label: '🤖 /model            Change Model', value: '/model', action: 'cmd' },
+            // SESSION - 8 commands
+            { label: '💾 /save             Save Session', value: '/save ', action: 'input' },
+            { label: '📂 /load             Load Session', value: '/load ', action: 'input' },
+            { label: '📋 /paste            Clipboard Paste', value: '/paste', action: 'cmd' },
+            { label: '📁 /project          Project Info', value: '/project', action: 'cmd' },
+            { label: '✍️ /write            Write Files', value: '/write', action: 'cmd' },
+            { label: '🗑️ /clear            Clear Session', value: '/clear', action: 'cmd' },
+            { label: '❓ /help             All Commands', value: '/help', action: 'cmd' },
+            { label: '🚪 /exit             Exit TUI', value: '/exit', action: 'cmd' },
         ];
+
+        // Filter out separators when searching
+        const filter = paletteFilter.toLowerCase();
+        const filteredItems = filter
+            ? menuItems.filter(item => item.action !== 'noop' && item.label.toLowerCase().includes(filter))
+            : menuItems;
+
+        // Handle menu selection
+        const handleMenuSelect = (item) => {
+            if (item.action === 'noop') return; // Separator clicked
+
+            if (item.action === 'toggle') {
+                // Execute toggle immediately
+                switch (item.value) {
+                    case 'toggle_smartx':
+                        setSoloMode(prev => !prev);
+                        break;
+                    case 'toggle_auto':
+                        setAutoApprove(prev => !prev);
+                        break;
+                    case 'toggle_agents':
+                        setMultiAgentEnabled(prev => !prev);
+                        break;
+                    case 'toggle_context':
+                        setContextEnabled(prev => !prev);
+                        break;
+                    case 'toggle_thinking':
+                        setExposedThinking(prev => !prev);
+                        break;
+                    case 'toggle_debug':
+                        debugLogger.toggle();
+                        break;
+                }
+                // Don't close - allow multiple toggles
+                return;
+            }
+
+            if (item.action === 'cmd') {
+                // Execute command immediately
+                setShowCommandPalette(false);
+                setPaletteFilter('');
+                setInput(item.value);
+                // Trigger submit
+                setTimeout(() => {
+                    // Auto-submit the command
+                }, 50);
+                return;
+            }
+
+            if (item.action === 'input') {
+                // Put in input field for user to complete
+                setShowCommandPalette(false);
+                setPaletteFilter('');
+                setInput(item.value);
+                return;
+            }
+        };
 
         return h(Box, {
             flexDirection: 'column',
+            borderStyle: 'round',
+            borderColor: 'cyan',
             padding: 1,
-            width: Math.min(60, columns - 4),
-            height: rows
+            width: Math.min(45, columns - 4),
         },
             // Header
-            h(Text, { color: 'cyan', bold: true }, '⚙ Settings Menu (Ctrl+K)'),
-            h(Text, { color: 'gray', dimColor: true }, '─'.repeat(30)),
-
-            // SETTINGS SECTION with toggles
-            h(Box, { marginTop: 1, marginBottom: 1, flexDirection: 'column' },
-                h(Text, { color: 'yellow', bold: true }, 'SETTINGS'),
-                ...settingsSection.map((setting, i) =>
-                    h(Box, { key: i, marginTop: 0 },
-                        h(Text, { color: 'gray' }, `  ${setting.name}: `),
-                        setting.value
-                            ? h(Text, { color: 'green', bold: true }, '[ON] ')
-                            : h(Text, { color: 'gray', dimColor: true }, '[OFF]'),
-                        h(Text, { color: 'gray', dimColor: true },
-                            setting.value ? ` → ${setting.offCmd}` : ` → ${setting.onCmd}`)
-                    )
-                )
-            ),
-
-            h(Text, { color: 'gray', dimColor: true }, '─'.repeat(30)),
-
-            // COMMANDS SECTION
-            h(Box, { marginTop: 1, flexDirection: 'column' },
-                h(Text, { color: 'yellow', bold: true }, 'COMMANDS'),
-                h(Text, { color: 'gray' }, '  /agents     Agent Menu'),
-                h(Text, { color: 'gray' }, '  /plan       Planner Agent'),
-                h(Text, { color: 'gray' }, '  /paste      Clipboard Paste'),
-                h(Text, { color: 'gray' }, '  /project    Project Info'),
-                h(Text, { color: 'gray' }, '  /write      Write Files'),
-                h(Text, { color: 'gray' }, '  /clear      Clear Session'),
-                h(Text, { color: 'gray' }, '  /smartx     SmartX Engine On/Off'),
-                h(Text, { color: 'gray' }, '  /auto       Auto-Approve On/Off'),
-                h(Text, { color: 'gray' }, '  /exit       Exit TUI')
-            ),
+            h(Text, { color: 'cyan', bold: true }, '⚙ Settings & Commands'),
+            h(Text, { color: 'gray', dimColor: true }, 'Use ↑↓ to navigate, Enter to select'),
 
             // Search input
-            h(Box, { marginTop: 1 },
-                h(Text, { color: 'gray' }, '> '),
+            h(Box, { marginTop: 1, marginBottom: 1 },
+                h(Text, { color: 'yellow' }, '🔍 '),
                 h(TextInput, {
                     value: paletteFilter,
                     onChange: setPaletteFilter,
-                    placeholder: 'Type command...'
+                    placeholder: 'Type to filter...'
                 })
             ),
 
-            // Filtered results (if searching)
-            filter && filteredCommands.length > 0
-                ? h(SelectInput, { items: filteredCommands, onSelect: handleCommandSelect })
-                : null,
+            // Menu items with SelectInput
+            h(Box, { flexDirection: 'column', height: Math.min(20, rows - 10) },
+                h(SelectInput, {
+                    items: filteredItems,
+                    onSelect: handleMenuSelect,
+                    itemComponent: ({ isSelected, label }) =>
+                        h(Text, {
+                            color: label.startsWith('─') ? 'gray' : (isSelected ? 'cyan' : 'white'),
+                            bold: isSelected,
+                            dimColor: label.startsWith('─')
+                        }, isSelected && !label.startsWith('─') ? `❯ ${label}` : `  ${label}`)
+                })
+            ),
 
             // Footer
             h(Box, { marginTop: 1 },
-                h(Text, { dimColor: true }, 'Esc to close')
+                h(Text, { dimColor: true }, 'Esc to close • Toggles update instantly')
             )
         );
     }
@@ -4374,7 +4714,8 @@ This gives the user a chance to refine requirements before implementation.
                         viewHeight: chatHeight - (thinkingLines.length > 0 ? 5 : 0) - 2,  // Adjust for thinking block
                         width: mainWidth - 6,        // Increased safety margin (was -4) to fix "eating" text
                         isActive: appState === 'chat',
-                        isStreaming: isLoading
+                        isStreaming: isLoading,
+                        project: project // Pass project prop
                     })
                 ),
 

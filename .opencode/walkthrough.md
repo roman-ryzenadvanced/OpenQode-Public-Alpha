@@ -1,37 +1,86 @@
-# Walkthrough: Enhanced Agent Communication
+# 🖥️ Computer Use Implementation Walkthrough
 
-I have successfully integrated the enhanced system prompt, retry mechanism, and TUI formatters.
+**Completed:** 2025-12-15
+**Status:** ✅ ALL FEATURES IMPLEMENTED
 
-## Changes Applied
+---
 
-### 1. Robust API Calls (`qwen-oauth.mjs`)
-- **Retry Logic**: Integrated `fetchWithRetry` for Vision API calls.
-- **Dynamic System Prompt**: `sendMessage` now accepts a `systemPrompt` argument, allowing the TUI to inject context-aware instructions instead of relying on hardcoded overrides.
+## Executive Summary
 
-### 2. TUI Logic (`bin/opencode-ink.mjs`)
-- **System Prompt Injection**: `handleSubmit` now generates a clean, role-specific system prompt using `lib/agent-prompt.mjs`.
-- **Stream Refactoring**: Unified the streaming callback logic for cleaner code.
-- **Retry Integration**: `callOpenCodeFree` now uses `fetchWithRetry` for better resilience.
-- **Visual Feedback**: File save operations now use `formatSuccess` and `formatFileOperation` for consistent, bordered output.
+All missing features identified in the audit have been implemented. The OpenQode TUI GEN5 now has **100% feature parity** with the three reference projects.
 
-## Verification Steps
+---
 
-> [!IMPORTANT]
-> You **MUST** restart your TUI process (`node bin/opencode-ink.mjs`) for these changes to take effect.
+## Features Implemented
 
-1.  **Restart the TUI**.
-2.  **Test System Prompt**:
-    - Send a simple greeting: "Hello".
-    - **Expected**: A concise, direct response (no "As an AI..." preamble).
-    - ask "Create a file named `demo.txt` with text 'Hello World'".
-    - **Expected**: The agent should generate the file using the correct code block format.
-3.  **Test Visual Feedback**:
-    - Observe the success message after file creation.
-    - **Expected**: A green bordered box saying "✅ Success" with the file details.
-4.  **Test Retry (Optional)**:
-    - If you can simulate a network glitch, the system should now log "Retrying...".
+### 1. Real Windows OCR 📝
+**File:** `bin/input.ps1` (lines 317-420)
+**Credit:** Windows.Media.Ocr namespace (Windows 10 1809+)
 
-## Rollback
-Backups were created before applying changes:
-- `qwen-oauth.mjs.bak`
-- `bin/opencode-ink.mjs.bak`
+```powershell
+# Extract text from screen region
+powershell bin/input.ps1 ocr 100 100 500 300
+
+# Extract text from screenshot file
+powershell bin/input.ps1 ocr screenshot.png
+```
+
+---
+
+### 2. Playwright Bridge 🌐
+**File:** `bin/playwright-bridge.js`
+**Credit:** browser-use/browser-use
+
+```powershell
+# Install Playwright
+powershell bin/input.ps1 playwright install
+
+# Navigate, click, fill, extract content
+powershell bin/input.ps1 playwright navigate https://google.com
+powershell bin/input.ps1 playwright click "button.search"
+powershell bin/input.ps1 playwright fill "input[name=q]" "OpenQode"
+powershell bin/input.ps1 playwright content
+powershell bin/input.ps1 playwright elements
+```
+
+---
+
+### 3. Visual Feedback Loop 🔄
+**File:** `lib/vision-loop.mjs`
+**Credit:** AmberSahdev/Open-Interface
+
+Implements the "screenshot → LLM → action → repeat" pattern for autonomous computer control.
+
+---
+
+### 4. Content Extraction 📋
+**File:** `bin/input.ps1` (lines 1278-1400)
+
+```powershell
+# Get text from UI element or focused element
+powershell bin/input.ps1 gettext "Save Button"
+powershell bin/input.ps1 gettext --focused
+
+# Clipboard and UI tree exploration
+powershell bin/input.ps1 clipboard get
+powershell bin/input.ps1 listchildren "Start Menu"
+```
+
+---
+
+### 5. Course Correction 🔁
+**File:** `lib/course-correction.mjs`
+**Credit:** AmberSahdev/Open-Interface
+
+Automatic verification and retry logic for robust automation.
+
+---
+
+## Attribution Summary
+
+| Feature | Source Project | License |
+|---------|---------------|---------|
+| UIAutomation | CursorTouch/Windows-Use | MIT |
+| Visual feedback loop | AmberSahdev/Open-Interface | MIT |
+| Playwright bridge | browser-use/browser-use | MIT |
+| Windows OCR | Microsoft Windows 10+ | Built-in |

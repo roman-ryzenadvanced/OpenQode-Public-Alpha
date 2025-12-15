@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <style>
+    body {
+      width: 350px;
+      padding: 15px;
+      font-family: Arial, sans-serif;
+      background-color: #f5f5f5;
+    }
+    .header {
+      text-align: center;
+      margin-bottom: 15px;
+    }
+    .header h1 {
+      font-size: 18px;
+      margin: 0;
+      color: #1a73e8;
+    }
+    .auth-section {
+      margin-bottom: 15px;
+    }
+    .auth-status {
+      padding: 8px;
+      border-radius: 4px;
+      margin-bottom: 10px;
+      text-align: center;
+    }
+    .authenticated {
+      background-color: #e6f4ea;
+      color: #137333;
+    }
+    .not-authenticated {
+      background-color: #fce8e6;
+      color: #c5221f;
+    }
+    .task-input {
+      width: 100%;
+      padding: 8px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      box-sizing: border-box;
+      margin-bottom: 10px;
+    }
+    .execute-btn {
+      width: 100%;
+      padding: 10px;
+      background-color: #1a73e8;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 14px;
+    }
+    .execute-btn:hover {
+      background-color: #0d62c9;
+    }
+    .execute-btn:disabled {
+      background-color: #ccc;
+      cursor: not-allowed;
+    }
+    .history {
+      margin-top: 15px;
+      max-height: 200px;
+      overflow-y: auto;
+    }
+    .history-item {
+      padding: 5px;
+      border-bottom: 1px solid #eee;
+      font-size: 12px;
+    }
+    .loading {
+      text-align: center;
+      padding: 10px;
+    }
+    .spinner {
+      border: 2px solid #f3f3f3;
+      border-top: 2px solid #1a73e8;
+      border-radius: 50%;
+      width: 20px;
+      height: 20px;
+      animation: spin 1s linear infinite;
+      margin: 0 auto;
+    }
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>🤖 Qwen AI Automation</h1>
+  </div>
+  
+  <div class="auth-section">
+    <div id="authStatus" class="auth-status not-authenticated">
+      Not authenticated with Qwen
+    </div>
+    <button id="authBtn" class="execute-btn">Authenticate with Qwen</button>
+  </div>
+  
+  <div id="taskSection" style="display: none;">
+    <textarea id="taskInput" class="task-input" rows="3" placeholder="Describe your automation task..."></textarea>
+    <button id="executeBtn" class="execute-btn">Execute Task</button>
+  </div>
+  
+  <div id="loading" class="loading" style="display: none;">
+    <div class="spinner"></div>
+    <div>Processing with AI...</div>
+  </div>
+  
+  <div class="history" id="history">
+    <h3>Recent Tasks</h3>
+    <div id="historyList"></div>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>

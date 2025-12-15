@@ -354,7 +354,10 @@ class QwenOAuth {
 
         // If systemPrompt is provided (New Flow), use it directly + message
         if (systemPrompt) {
-            finalMessage = systemPrompt + '\n\n' + message;
+            // STRICT PROMPT ENGINEERING:
+            // Wrap system instructions in explicit brackets to force model adherence
+            // and separate clearly from user message.
+            finalMessage = `[SYSTEM INSTRUCTION START]\n${systemPrompt}\n[SYSTEM INSTRUCTION END]\n\n[USER MESSAGE START]\n${message}\n[USER MESSAGE END]`;
         } else {
             // Legacy Flow: Prepend hardcoded context for specific keywords
             const systemContext = `[SYSTEM CONTEXT - ALWAYS FOLLOW]

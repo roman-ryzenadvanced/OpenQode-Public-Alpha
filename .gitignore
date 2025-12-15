@@ -18,6 +18,15 @@ config.cjs
 .opencode/session_log.md
 session-*.md
 *session*.md
+session_logs/
+chat_logs/
+
+# Config & Backup
+config.mjs
+*.bak
+*.old
+*.tmp
+qwen-oauth.mjs.bak
 
 # All log files
 *.log

@@ -31,6 +31,8 @@ import {
 } from './tui-layout.mjs';
 // Smart Agent Flow - Multi-agent routing system
 import { getSmartAgentFlow } from './smart-agent-flow.mjs';
+// IQ Exchange - Translation Layer
+import { IQExchange } from '../lib/iq-exchange.mjs';
 // Pro Protocol: Text sanitization
 import { cleanContent, decodeEntities, stripDebugNoise } from './ui/utils/textFormatter.mjs';
 // Pro Protocol: Run state management and timeout UI
@@ -360,8 +362,14 @@ const getModelsByGroup = () => {
 };
 
 // ═══════════════════════════════════════════════════════════════
-// AGENTIC COMMAND EXECUTION
+// IQ EXCHANGE - SIMPLIFIED SELF-HEALING COMMAND EXECUTION
 // ═══════════════════════════════════════════════════════════════
+
+// System paths for reliable execution
+const SYSTEM_PATHS = {
+    playwrightBridge: path.join(__dirname, 'playwright-bridge.js').replace(/\\/g, '/'),
+    inputPs1: path.join(__dirname, 'input.ps1').replace(/\\/g, '/')
+};
 
 const extractCommands = (text) => {
     const commands = [];
@@ -379,33 +387,70 @@ const extractCommands = (text) => {
     return commands;
 };
 
-// CRITICAL: runShellCommandStreaming for real-time output & abort control
+/**
+ * Normalize command paths for reliable execution
+ */
+const normalizeCommand = (cmd) => {
+    let normalized = cmd;
+
+    // Fix PowerShell: ensure -File flag is present
+    if (cmd.includes('input.ps1')) {
+        if (!cmd.includes('-File')) {
+            // Extract the command arguments after the script path
+            const match = cmd.match(/powershell\s+["']?[^"'\s]*input\.ps1["']?\s*(.*)/i);
+            if (match) {
+                normalized = `powershell -NoProfile -ExecutionPolicy Bypass -File "${SYSTEM_PATHS.inputPs1}" ${match[1] || ''}`;
+            }
+        } else {
+            // Replace the path with our absolute path
+            normalized = cmd.replace(/["'][^"']*input\.ps1["']|[^\s"']*input\.ps1/gi, `"${SYSTEM_PATHS.inputPs1}"`);
+        }
+    }
+
+    // Fix Playwright: use absolute path
+    if (cmd.includes('playwright-bridge')) {
+        normalized = normalized.replace(/["'][^"']*playwright-bridge\.js["']|[^\s"']*playwright-bridge\.js/gi, `"${SYSTEM_PATHS.playwrightBridge}"`);
+    }
+
+    return normalized;
+};
+
+/**
+ * Command runner with output capture
+ * Returns {promise, child} for abort support
+ */
 const runShellCommandStreaming = (cmd, cwd = process.cwd(), onData = () => { }) => {
-    return new Promise((resolve) => {
-        // Use spawn with shell option for compatibility
-        const child = spawn(cmd, {
+    const normalizedCmd = normalizeCommand(cmd);
+
+    let child;
+    const promise = new Promise((resolve) => {
+        child = spawn(normalizedCmd, {
             cwd,
             shell: true,
-            std: ['ignore', 'pipe', 'pipe'], // Ignore stdin, pipe stdout/stderr
             env: { ...process.env, FORCE_COLOR: '1' }
         });
 
-        // Capture stdout
+        let stdout = '';
+        let stderr = '';
+
         child.stdout.on('data', (data) => {
             const str = data.toString();
+            stdout += str;
             onData(str);
         });
 
-        // Capture stderr
         child.stderr.on('data', (data) => {
             const str = data.toString();
+            stderr += str;
             onData(str);
         });
 
         child.on('close', (code) => {
             resolve({
                 success: code === 0,
-                code: code || 0
+                code: code || 0,
+                stdout,
+                stderr
             });
         });
 
@@ -414,30 +459,25 @@ const runShellCommandStreaming = (cmd, cwd = process.cwd(), onData = () => { }) 
             resolve({
                 success: false,
                 code: 1,
-                error: err.message
+                error: err.message,
+                stdout,
+                stderr
             });
         });
-
-        // Expose the child process via the promise (unconventional but useful here)
-        resolve.child = child;
     });
+
+    return { promise, child };
 };
 
-const runShellCommand = (cmd, cwd = process.cwd()) => {
-    return new Promise((resolve) => {
-        // Use exec which handles shell command strings (quotes, spaces) correctly
-        exec(cmd, {
-            cwd,
-            env: { ...process.env, FORCE_COLOR: '1' },
-            maxBuffer: 1024 * 1024 * 5 // 5MB buffer for larger outputs
-        }, (error, stdout, stderr) => {
-            resolve({
-                success: !error,
-                output: stdout + (stderr ? '\n' + stderr : ''),
-                code: error ? (error.code || 1) : 0
-            });
-        });
-    });
+const runShellCommand = async (cmd, cwd = process.cwd()) => {
+    let output = '';
+    const { promise } = runShellCommandStreaming(cmd, cwd, (data) => { output += data; });
+    const result = await promise;
+    return {
+        success: result.success,
+        output: output || (result.stdout || '') + (result.stderr ? '\n' + result.stderr : ''),
+        code: result.code || 0
+    };
 };
 
 // Current free model state (default to grok-code-fast-1)
@@ -1450,34 +1490,71 @@ const ArtifactBlock = ({ content, isStreaming }) => {
 };
 
 // ═══════════════════════════════════════════════════════════════
-// DISCORD-STYLE CODE CARD
+// DISCORD-STYLE CODE CARD (Updated with Google-Style Friendly Paths)
 // Code blocks with header bar, language label, and distinct styling
 // ═══════════════════════════════════════════════════════════════
-const CodeCard = ({ language, filename, content, width, isStreaming }) => {
+const CodeCard = ({ language, filename, content, width, isStreaming, project }) => { // Added project prop
     const lineCount = content.split('\n').length;
     const [isExpanded, setIsExpanded] = useState(false);
 
     // Calculate safe content width accounting for spacing
     const contentWidth = width ? width - 4 : 60; // Account for left gutter (2) and spacing (2)
 
+    // SMART PATH RESOLUTION
+    // Resolve the display path relative to the project root for a "Friendly" view
+    const displayPath = useMemo(() => {
+        if (!filename || filename === 'snippet.txt') return { dir: '', base: filename || 'snippet' };
+
+        // If we have a project root, try to resolve relative path
+        if (project && filename) {
+            try {
+                // If it's absolute, make it relative to project
+                if (path.isAbsolute(filename)) {
+                    const rel = path.relative(project, filename);
+                    if (!rel.startsWith('..') && !path.isAbsolute(rel)) {
+                        return { dir: path.dirname(rel), base: path.basename(rel) };
+                    }
+                }
+                // If it's already relative (likely from AI response like 'src/index.js')
+                // Check if it has directory limits
+                if (filename.includes('/') || filename.includes('\\')) {
+                    return { dir: path.dirname(filename), base: path.basename(filename) };
+                }
+            } catch (e) { /* ignore path errors */ }
+        }
+        return { dir: '', base: filename };
+    }, [filename, project]);
+
     // Determine if we should show the expand/collapse functionality
-    const needsExpansion = lineCount > 10 && !isStreaming; // Don't expand during streaming
+    // Smart Streaming Tail: If streaming and very long, collapse middle to show progress
+    const STREAMING_MAX_LINES = 20;
+    const STATIC_MAX_LINES = 10;
+
+    // Always allow expansion if long enough
+    const isLong = lineCount > (isStreaming ? STREAMING_MAX_LINES : STATIC_MAX_LINES);
 
     const renderContent = () => {
-        if (isExpanded || !needsExpansion) {
+        if (isExpanded || !isLong) {
             return h(Markdown, { syntaxTheme: 'github', width: contentWidth }, `\`\`\`${language}\n${content}\n\`\`\``);
         }
 
-        // Collapsed view: show first few and last few lines
-        const lines = content.split('\n');
-        if (lines.length <= 10) {
-            return h(Markdown, { syntaxTheme: 'github', width: contentWidth }, `\`\`\`${language}\n${content}\n\`\`\``);
+        // Collapsed Logic
+        let firstLines, lastLines, hiddenCount;
+
+        if (isStreaming) {
+            // Streaming Mode: Show Head + Active Tail
+            // This ensures user sees the code BEING written
+            firstLines = lines.slice(0, 5).join('\n');
+            lastLines = lines.slice(-10).join('\n'); // Show last 10 lines for context
+            hiddenCount = lineCount - 15;
+        } else {
+            // Static Mode: Show Head + Foot
+            firstLines = lines.slice(0, 5).join('\n');
+            lastLines = lines.slice(-3).join('\n');
+            hiddenCount = lineCount - 8;
         }
 
-        const firstLines = lines.slice(0, 5).join('\n');
-        const lastLines = lines.slice(-3).join('\n');
-        const previewContent = `${firstLines}\n... [${lineCount - 8} more lines]\n${lastLines}`;
-
+        const previewContent = `${firstLines}\n\n// ... (${hiddenCount} lines hidden) ...\n\n${lastLines}`;
         return h(Markdown, { syntaxTheme: 'github', width: contentWidth }, `\`\`\`${language}\n${previewContent}\n\`\`\``);
     };
 
@@ -1487,13 +1564,18 @@ const CodeCard = ({ language, filename, content, width, isStreaming }) => {
         marginLeft: 2,
         marginBottom: 1
     },
-        // Simple header with filename and controls - opencode style
+        // SMART HEADER with Friendly Path
         h(Box, {
             flexDirection: 'row',
             justifyContent: 'space-between',
             marginBottom: 0.5
         },
-            h(Text, { color: 'cyan', bold: true }, `${filename} (${language}) `),
+            h(Box, { flexDirection: 'row' },
+                displayPath.dir && displayPath.dir !== '.' ?
+                    h(Text, { color: 'gray', dimColor: true }, `📂 ${displayPath.dir} / `) : null,
+                h(Text, { color: 'cyan', bold: true }, `📄 ${displayPath.base}`),
+                h(Text, { color: 'gray', dimColor: true }, ` (${language})`)
+            ),
             h(Text, { color: 'gray', dimColor: true }, `${lineCount} lines`)
         ),
 
@@ -1506,13 +1588,13 @@ const CodeCard = ({ language, filename, content, width, isStreaming }) => {
             renderContent()
         ),
 
-        // Expand/collapse control - simple text style
-        needsExpansion ? h(Box, {
+        // Expand/collapse control
+        isLong ? h(Box, {
             flexDirection: 'row',
             justifyContent: 'flex-end',
             marginTop: 0.5
         },
-            h(Text, { color: 'cyan', dimColor: true }, isExpanded ? '▼ collapse' : '▶ expand ')
+            h(Text, { color: 'cyan', dimColor: true }, isExpanded ? '▼ collapse' : (isStreaming ? '▼ auto-scroll (expand to view all)' : '▶ expand'))
         ) : null
     );
 };
@@ -1568,10 +1650,62 @@ const UserCard = ({ content, width }) => {
     );
 };
 
+// Helper to parse content into blocks (Text vs Code)
+const parseMessageToBlocks = (text) => {
+    const blocks = [];
+    const codeRegex = /```(\w+)?(?:[:\s]+)?([^\n`]+\.\w+)?\n([\s\S]*?)```/g;
+    let match;
+    let lastIndex = 0;
+
+    // 1. Find all CLOSED (complete) code blocks
+    while ((match = codeRegex.exec(text)) !== null) {
+        // Text before code
+        const preText = text.slice(lastIndex, match.index);
+        if (preText) blocks.push({ type: 'text', content: preText });
+
+        // Code block
+        blocks.push({
+            type: 'code',
+            language: match[1] || 'text',
+            filename: match[2] || 'snippet.txt',
+            content: match[3].trim(),
+            isComplete: true
+        });
+        lastIndex = match.index + match[0].length;
+    }
+
+    // 2. Check remaining text for OPEN (incomplete/streaming) code block
+    const remaining = text.slice(lastIndex);
+    // Regex matches: ```lang filename? \n body... (end of string)
+    const openBlockRegex = /```(\w+)?(?:[:\s]+)?([^\n`]+\.\w+)?\n([\s\S]*)$/;
+    const openMatch = openBlockRegex.exec(remaining);
+
+    if (openMatch) {
+        const preText = remaining.slice(0, openMatch.index);
+        if (preText) blocks.push({ type: 'text', content: preText });
+
+        blocks.push({
+            type: 'code',
+            language: openMatch[1] || 'text',
+            filename: openMatch[2] || 'snippet.txt',
+            content: openMatch[3], // Keep whitespace for streaming
+            isComplete: false
+        });
+    } else if (remaining) {
+        blocks.push({ type: 'text', content: remaining });
+    }
+
+    return blocks.length ? blocks : [{ type: 'text', content: text }];
+};
+
 // AGENT CARD - Enhanced streaming with premium feel
 // Text-focused with minimal styling, clean left gutter
-const AgentCard = ({ content, isStreaming, width }) => {
+const AgentCard = ({ content, isStreaming, width, project }) => { // Added project prop
     const contentWidth = width ? width - 4 : undefined; // Account for left gutter and spacing
+
+    // Parse content into blocks to support Collapsible Code Cards
+    // Memoize to prevent flicker during fast streaming
+    const blocks = useMemo(() => parseMessageToBlocks(content || ''), [content]);
 
     return h(Box, {
         flexDirection: 'row',
@@ -1596,16 +1730,28 @@ const AgentCard = ({ content, isStreaming, width }) => {
             flexGrow: 1,
             minWidth: 10
         },
-            // Content with enhanced streaming effect
-            h(Box, { width: contentWidth },
-                isStreaming
-                    ? h(EnhancedTypewriterText, {
-                        children: content || '',
-                        speed: 25, // Optimal speed for readability
-                        batchSize: 1  // Can be increased for batching (safely set to 1 for now)
-                    })
-                    : h(Markdown, { syntaxTheme: 'github', width: contentWidth }, content || '')
-            )
+            blocks.map((block, i) => {
+                if (block.type === 'code') {
+                    return h(CodeCard, {
+                        key: i,
+                        ...block,
+                        width: contentWidth,
+                        isStreaming: isStreaming,
+                        project: project // Pass project down
+                    });
+                }
+
+                // Text Block
+                return h(Box, { key: i, width: contentWidth, marginBottom: 1 },
+                    isStreaming && i === blocks.length - 1
+                        ? h(EnhancedTypewriterText, {
+                            children: block.content,
+                            speed: 25,
+                            batchSize: 2
+                        })
+                        : h(Markdown, { syntaxTheme: 'github', width: contentWidth }, block.content)
+                );
+            })
         )
     );
 };
@@ -1825,7 +1971,7 @@ const LegacyScrollableChat = ({ messages, viewHeight, width, isActive = true, is
     );
 };
 
-const ScrollableChat = ({ messages, viewHeight, width, isActive = true, isStreaming = false }) => {
+const ScrollableChat = ({ messages, viewHeight, width, isActive = true, isStreaming = false, project }) => { // Added project prop
     // Flatten messages into scrollable blocks
     // Memoize to prevent expensive re-parsing on every cursor blink
     const blocks = useMemo(() => flattenMessagesToBlocks(messages), [messages]);
@@ -1899,10 +2045,9 @@ const ScrollableChat = ({ messages, viewHeight, width, isActive = true, isStream
                     meta: block.meta,
                     width: width,
                     isStreaming: isLastAssistantAndStreaming,
-                    // Pass context to help UI (e.g. continuous rails)
-                    isFirst: block.isFirst,
-                    isLast: block.isLast,
-                    type: block.type
+                    width: width,
+                    isStreaming: isLastAssistantAndStreaming,
+                    project: project // Fix: Pass project from ScrollableChat props
                 });
             })
         ),
@@ -2188,37 +2333,15 @@ const ModelSelector = ({
 // VIEWPORT MESSAGE - Unified Message Protocol Renderer (Alt)
 // Supports meta field for consistent styling
 // ═══════════════════════════════════════════════════════════════
-const ViewportMessage = ({ role, content, meta, width = 80, isFirst = true, isLast = true, type = 'text', blocks = [], isStreaming = false }) => {
+const ViewportMessage = ({ role, content, meta, width = 80, isFirst = true, isLast = true, type = 'text', blocks = [], isStreaming = false, project }) => { // Added project
     // PRO API: Use ChatBubble for everything
-
-    // For Assistant, we handle code blocks separately if they exist?
-    // Actually, ChatBubble for AI just takes content. 
-    // Markdown rendering happens inside? 
-    // Wait, the current implementation passed `blocks` to render code cards.
-    // If we wrap `markdown` content in bubble, `ChatBubble` needs to support children rendering.
-
-    // Let's refactor ChatBubble usage slightly:
-    // User/System messages are pure text -> ChatBubble handles well.
-    // Assistant messages might be mixed (Text + CodeCards).
-    // The previous implementation did:
-    /*
-        h(Box, { marginLeft: 2, flexDirection: 'column' },
-            blocks && blocks.length > 0
-                ? blocks.map((b, i) =>
-                    b.type === 'text'
-                        ? h(Text, { key: i, wrap: 'wrap' }, b.content)
-                        : h(CodeCard, { key: i, ...b })
-                )
-                : h(Text, { wrap: 'wrap' }, content)
-        )
-    */
-
     if (role === 'assistant') {
         // Use the improved AgentCard for consistent streaming experience
         return h(AgentCard, {
             content: content,
             isStreaming: isStreaming,
-            width: width
+            width: width,
+            project: project // Pass project
         });
     }
 
@@ -2322,6 +2445,10 @@ const App = () => {
     // SMARTX ENGINE STATE
     const [soloMode, setSoloMode] = useState(false);
     const [autoApprove, setAutoApprove] = useState(false); // Auto-execute commands in SmartX Engine
+
+    // IQ EXCHANGE: Retry counter for auto-heal loop (prevents infinite retries)
+    const [iqRetryCount, setIqRetryCount] = useState(0);
+    const IQ_MAX_RETRIES = 5; // Maximum auto-heal attempts
 
     // AUTO-APPROVE: Automatically execute commands in SmartX Engine
     useEffect(() => {
@@ -3216,47 +3343,52 @@ const App = () => {
                     setMessages(prev => [...prev, {
                         role: 'system',
                         content: `## ⚡ Quick Commands
-
- **AGENT**
- * \`/agents\` - Switch AI Persona
- * \`/context\` - Toggle Smart Context (${contextEnabled ? 'ON' : 'OFF'})
- * \`/thinking\` - Toggle Exposed Thinking (${exposedThinking ? 'ON' : 'OFF'})
- * \`/reset\` - Clear Session Memory
-
- **IDE POWER FEATURES**
- * \`/theme [name]\` - Switch theme (dracula/monokai/nord/matrix)
- * \`/find [query]\` - Fuzzy file finder
- * \`/todos\` - Show TODO/FIXME comments from project
-
- **TASK MANAGEMENT**
- * \`/todo <task>\` - Add new task
- * \`/todos\` - Show all tasks
- * \`/todo-complete <id>\` - Mark task as complete
- * \`/todo-delete <id>\` - Delete task
- * \`Ctrl+T\` - Open todo list UI
-
- **SESSION MANAGEMENT**
- * \`/save <name>\` - Save current session
- * \`/load <name>\` - Load saved session
- * \`/sessions\` - List all sessions
- * \`/changes\` - Show modified files this session
-
- **CUSTOM COMMANDS**
- * \`/cmd\` - List custom commands
- * \`/cmd <name>\` - Execute custom command
-
- **INPUT**
- * \`/paste\` - Paste from Clipboard (multi-line)
-
- **DEPLOY**
- * \`/push\` - Git Add + Commit + Push
- * \`/deploy\` - Deploy to Vercel
-
- **TOOLS**
- * \`/run <cmd>\` - Execute Shell Command
- * \`/ssh\` - SSH Connection
- * \`/write\` - Write Pending Code Files
- * \`/clear\` - Reset Chat`,
+ 
+  **AGENT**
+  * \`/agents\` - Switch AI Persona
+  * \`/context\` - Toggle Smart Context (${contextEnabled ? 'ON' : 'OFF'})
+  * \`/thinking\` - Toggle Exposed Thinking (${exposedThinking ? 'ON' : 'OFF'})
+  * \`/reset\` - Clear Session Memory
+ 
+  **IDE POWER FEATURES**
+  * \`/theme [name]\` - Switch theme (dracula/monokai/nord/matrix)
+  * \`/find [query]\` - Fuzzy file finder
+  * \`/todos\` - Show TODO/FIXME comments from project
+ 
+  **TASK MANAGEMENT**
+  * \`/todo <task>\` - Add new task
+  * \`/todos\` - Show all tasks
+  * \`/todo-complete <id>\` - Mark task as complete
+  * \`/todo-delete <id>\` - Delete task
+  * \`Ctrl+T\` - Open todo list UI
+ 
+  **SESSION MANAGEMENT**
+  * \`/save <name>\` - Save current session
+  * \`/load <name>\` - Load saved session
+  * \`/sessions\` - List all sessions
+  * \`/changes\` - Show modified files this session
+ 
+  **CUSTOM COMMANDS**
+  * \`/cmd\` - List custom commands
+  * \`/cmd <name>\` - Execute custom command
+ 
+  **INPUT**
+  * \`/paste\` - Paste from Clipboard (multi-line)
+ 
+  **DEPLOY**
+  * \`/push\` - Git Add + Commit + Push
+  * \`/deploy\` - Deploy to Vercel
+ 
+  **COMPUTER USE**
+  * Use natural language like "click the Start menu" or "open Settings"
+  * The AI will automatically generate PowerShell commands using input.ps1
+  * Advanced: Use \`powershell bin/input.ps1\` commands directly with /run
+ 
+  **TOOLS**
+  * \`/run <cmd>\` - Execute Shell Command
+  * \`/ssh\` - SSH Connection
+  * \`/write\` - Write Pending Code Files
+  * \`/clear\` - Reset Chat`,
                         meta: {
                             title: 'AVAILABLE COMMANDS',
                             badge: '📚',
@@ -3496,18 +3628,300 @@ const App = () => {
             // Generate the optimized system prompt
             const systemInstruction = getSystemPrompt({
                 role: agent,
-                capabilities: capabilities,
+                capabilities: [...capabilities,
+                    "Windows UI Automation (mouse, keyboard, screenshot, app control)",
+                    "PowerShell script execution for computer use",
+                    "GUI element detection and interaction"
+                ],
                 cwd: project || process.cwd(),
                 context: projectContext, // Now includes history and logs
-                os: process.platform
+                os: process.platform,
+                skills: getAllSkills(), // Pass all available skills for listing
+                activeSkill: activeSkill ? getSkill(activeSkill) : null, // Pass active skill object
+                // Add computer use capabilities to the context
+                computerUseEnabled: true
             });
 
             // Prepare prompt variations
             // For OpenCode Free (Legacy/OpenAI-like), we append system prompt to user message if needed
             const fullPromptForFree = systemInstruction + '\n\n[USER REQUEST]\n' + fullText;
 
+            // ═══════════════════════════════════════════════════════════════
+            // COMPUTER USE TRANSLATION LAYER
+            // Translates organic user requests into structured computer use commands
+            // Uses AI model to understand intent and convert to executable flows
+            // ═══════════════════════════════════════════════════════════════
+
+            // ═══════════════════════════════════════════════════════════════
+            // IQ EXCHANGE - INTELLIGENT REQUEST TRANSLATION SYSTEM
+            // Translates natural language requests into structured computer use flows
+            // Uses AI model to understand intent, select agents/skills, and convert to executable commands
+            // ═══════════════════════════════════════════════════════════════
+
+            // Computer use pattern detection with confidence scoring
+            const computerUsePatterns = {
+                // High confidence patterns (score: 3)
+                'desktop_interaction': {
+                    keywords: ['click on', 'click the', 'double click', 'right click', 'left click', 'press on', 'press the'],
+                    score: 3
+                },
+                'app_launch': {
+                    keywords: ['open', 'launch', 'start', 'run', 'open up', 'launch the', 'start the'],
+                    score: 3
+                },
+                'web_browse': {
+                    keywords: ['google', 'search for', 'visit', 'go to', 'navigate to', 'browse to'],
+                    score: 3
+                },
+
+                // Medium confidence patterns (score: 2) 
+                'ui_elements': {
+                    keywords: ['start menu', 'taskbar', 'window', 'dialog', 'button', 'menu', 'toolbar'],
+                    score: 2
+                },
+                'system_actions': {
+                    keywords: ['close', 'minimize', 'maximize', 'switch to', 'focus on', 'bring up'],
+                    score: 2
+                },
+
+                // Low confidence patterns (score: 1)
+                'general_interaction': {
+                    keywords: ['app', 'application', 'program', 'software', 'file', 'folder', 'settings'],
+                    score: 1
+                }
+            };
+
+            // Calculate confidence score for computer use request
+            let confidenceScore = 0;
+            let matchedPatterns = [];
+
+            for (const [patternName, patternData] of Object.entries(computerUsePatterns)) {
+                for (const keyword of patternData.keywords) {
+                    if (fullText.toLowerCase().includes(keyword.toLowerCase())) {
+                        confidenceScore += patternData.score;
+                        if (!matchedPatterns.includes(patternName)) {
+                            matchedPatterns.push(patternName);
+                        }
+                    }
+                }
+            }
+
+            // Define threshold for considering it a computer use request
+            const computerUseThreshold = 2; // At least medium confidence
+
+            let processedUserMessage = fullText;
+
+            if (confidenceScore >= computerUseThreshold) {
+                // Get available skills for intelligent selection
+                const allSkills = getAllSkills();
+                const skillNames = allSkills.map(skill => skill.id).join(', ');
+
+                // Calculate absolute paths for playwright-bridge and input.ps1
+                const playwrightBridgePath = path.join(__dirname, 'playwright-bridge.js').replace(/\\\\/g, '/');
+                const inputPs1Path = path.join(__dirname, 'input.ps1').replace(/\\\\/g, '/');
+
+                // Enhanced IQ Exchange - FULL NLP TRANSLATION LAYER
+                processedUserMessage = `
+╔══════════════════════════════════════════════════════════════════════════════════╗
+║  IQ EXCHANGE - NATURAL LANGUAGE TO COMPUTER USE TRANSLATOR                       ║
+║  Confidence: ${confidenceScore}/9 | Patterns: ${matchedPatterns.join(', ')}
+╚══════════════════════════════════════════════════════════════════════════════════╝
+
+USER REQUEST (translate this to executable commands):
+"${fullText}"
+
+═══════════════════════════════════════════════════════════════════════════════════
+YOUR ROLE: You are an intelligent translator that converts ANY human request into 
+precise, executable automation commands. Think step-by-step about what the user wants.
+═══════════════════════════════════════════════════════════════════════════════════
+
+STEP 1: ANALYZE the user's intent
+- What website/app do they want to interact with?
+- What actions do they want performed?
+- In what order?
+
+STEP 2: TRANSLATE to commands using these tools:
+
+🌐 BROWSER AUTOMATION (Playwright - persistent session):
+IMPORTANT: Use the ABSOLUTE PATH shown below!
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│ node "${playwrightBridgePath}" navigate "URL"      │ Go to any website           │
+│ node "${playwrightBridgePath}" fill "selector" "text" │ Fill form/input fields   │
+│ node "${playwrightBridgePath}" click "selector"    │ Click buttons/links         │
+│ node "${playwrightBridgePath}" press "Key"         │ Press keyboard (Enter, Tab) │
+│ node "${playwrightBridgePath}" type "text"         │ Type text at cursor         │
+│ node "${playwrightBridgePath}" elements            │ List clickable elements     │
+│ node "${playwrightBridgePath}" content             │ Extract page text           │
+│ node "${playwrightBridgePath}" wait "selector"     │ Wait for element to appear  │
+│ node "${playwrightBridgePath}" screenshot "file"   │ Take screenshot             │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+
+🖥️ DESKTOP AUTOMATION (PowerShell) - FOR NON-BROWSER APPS ONLY:
+IMPORTANT: Use EXACT command format with -File flag!
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│ powershell -NoProfile -ExecutionPolicy Bypass -File "${inputPs1Path}" open "app.exe"       │
+│ powershell -NoProfile -ExecutionPolicy Bypass -File "${inputPs1Path}" uiclick "Button"     │
+│ powershell -NoProfile -ExecutionPolicy Bypass -File "${inputPs1Path}" type "text"          │
+│ powershell -NoProfile -ExecutionPolicy Bypass -File "${inputPs1Path}" key LWIN             │
+│ powershell -NoProfile -ExecutionPolicy Bypass -File "${inputPs1Path}" mouse X Y            │
+│ powershell -NoProfile -ExecutionPolicy Bypass -File "${inputPs1Path}" click                │
+│ powershell -NoProfile -ExecutionPolicy Bypass -File "${inputPs1Path}" drag X1 Y1 X2 Y2     │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+⛔ CRITICAL RULES - NEVER VIOLATE:
+═══════════════════════════════════════════════════════════════════════════════════
+1. NEVER use PowerShell "open" with URLs or browser names for web tasks
+2. NEVER mix PowerShell and Playwright in the same web workflow
+3. ALL web tasks MUST use ONLY Playwright commands
+4. PowerShell "open" is ONLY for desktop apps like calc.exe, notepad.exe
+5. If user says "open Edge/Chrome" for web browsing → use Playwright navigate!
+═══════════════════════════════════════════════════════════════════════════════════
+
+❌ WRONG (missing -File flag or mixing browsers):
+powershell "${inputPs1Path}" open "msedge.exe"  ← WRONG: missing -File flag!
+powershell -File "${inputPs1Path}" open "msedge.exe https://google.com"  ← WRONG: opens different browser!
+
+✅ CORRECT (single browser):
+node "${playwrightBridgePath}" navigate "https://google.com"    ← Same browser
+node bin/playwright-bridge.js fill "textarea[name='q']" "text" ← Same browser
+node bin/playwright-bridge.js press "Enter"                    ← Same browser
+
+
+STEP 3: OUTPUT commands in code blocks
+
+═══════════════════════════════════════════════════════════════════════════════════
+TRANSLATION EXAMPLES:
+═══════════════════════════════════════════════════════════════════════════════════
+
+User: "search for cats on youtube"
+Translation:
+\`\`\`bash
+node "${playwrightBridgePath}" navigate "https://youtube.com"
+\`\`\`
+\`\`\`bash
+node "${playwrightBridgePath}" fill "input[name='search_query']" "cats"
+\`\`\`
+\`\`\`bash
+node "${playwrightBridgePath}" press "Enter"
+\`\`\`
+
+User: "go to amazon and search for laptop"
+Translation:
+\`\`\`bash
+node "${playwrightBridgePath}" navigate "https://amazon.com"
+\`\`\`
+\`\`\`bash
+node "${playwrightBridgePath}" fill "#twotabsearchtextbox" "laptop"
+\`\`\`
+\`\`\`bash
+node "${playwrightBridgePath}" press "Enter"
+\`\`\`
+
+User: "open google docs and type hello world"
+Translation:
+\`\`\`bash
+node "${playwrightBridgePath}" navigate "https://docs.google.com"
+\`\`\`
+\`\`\`bash
+node "${playwrightBridgePath}" click "text='Blank'"
+\`\`\`
+\`\`\`bash
+node "${playwrightBridgePath}" type "hello world"
+\`\`\`
+
+User: "fill the email field with test@example.com"
+Translation:
+\`\`\`bash
+node "${playwrightBridgePath}" fill "input[type='email']" "test@example.com"
+\`\`\`
+
+User: "click the submit button"
+Translation:
+\`\`\`bash
+node "${playwrightBridgePath}" click "button[type='submit']"
+\`\`\`
+
+User: "open calculator"
+Translation:
+\`\`\`powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File "${inputPs1Path}" open "calc.exe"
+\`\`\`
+
+User: "open paint and draw a circle"
+🧠 SMART TRANSLATION:
+- Paint canvas starts around x=100, y=200 after opening
+- "Circle" = use Ellipse tool, hold Shift while dragging for perfect circle
+- "Draw" = use drag command with reasonable canvas coordinates
+- Screen is typically 1920x1080, center area is safe
+
+Translation:
+\`\`\`powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File "${inputPs1Path}" open "mspaint.exe"
+\`\`\`
+\`\`\`powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File "${inputPs1Path}" keydown "SHIFT"
+\`\`\`
+\`\`\`powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File "${inputPs1Path}" drag 300 300 500 500
+\`\`\`
+\`\`\`powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File "${inputPs1Path}" keyup "SHIFT"
+\`\`\`
+
+🧠 SMART COORDINATE GUIDELINES:
+- "Center of screen" → approximately 960, 540 (1920x1080)
+- "Top left" → approximately 200, 200
+- "Small shape" → drag distance of 100-150 pixels
+- "Large shape" → drag distance of 300+ pixels
+- "In Paint canvas" → start around x=300, y=300 (left toolbar is ~100px wide)
+
+User: "open notepad and type hello"
+Translation:
+\`\`\`powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File "${inputPs1Path}" open "notepad.exe"
+\`\`\`
+\`\`\`powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File "${inputPs1Path}" type "hello"
+\`\`\`
+
+User: "press windows key"
+Translation:
+\`\`\`powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File "${inputPs1Path}" key "LWIN"
+\`\`\`
+
+User: "what's on the current page?"
+Translation:
+\`\`\`bash
+node "${playwrightBridgePath}" content
+\`\`\`
+
+
+═══════════════════════════════════════════════════════════════════════════════════
+COMMON SELECTORS REFERENCE:
+═══════════════════════════════════════════════════════════════════════════════════
+Google Search: textarea[name='q']
+YouTube Search: input[name='search_query']
+Amazon Search: #twotabsearchtextbox
+Generic Submit: button[type='submit'], input[type='submit']
+Generic Email: input[type='email'], input[name='email']
+Generic Password: input[type='password']
+By Text: text='Click Me'
+By ID: #element-id
+By Class: .class-name
+
+═══════════════════════════════════════════════════════════════════════════════════
+NOW TRANSLATE THE USER'S REQUEST: "${fullText}"
+═══════════════════════════════════════════════════════════════════════════════════
+Provide a brief explanation of what you'll do, then output the commands in separate code blocks.
+IMPORTANT: Browser commands STAY IN THE SAME SESSION - don't navigate away unless asked!`;
+            } else {
+                processedUserMessage = fullText;
+            }
+
             // For Qwen (SmartX), we pass system prompt securely as a separate argument
-            const userMessage = fullText;
+            const userMessage = processedUserMessage;
 
             let fullResponse = '';
 
@@ -3588,15 +4002,86 @@ const App = () => {
                 // Just potentially update the final one to ensure clean state if needed, 
                 // but usually streaming result is fine.
 
-                // Extract files for AUTO-WRITE (Magic File Writer)
-                const files = extractCodeBlocks(responseText);
+                // ═══════════════════════════════════════════════════════════════
+                // IQ EXCHANGE: COMPUTER USE TRANSLATION LAYER
+                // Translates organic user requests into executable computer use flows
+                // ═══════════════════════════════════════════════════════════════
 
-                // NEW: Extract & Detect Commands
-                const cmds = extractCommands(responseText);
+                const computerUseKeywords = [
+                    'click', 'open', 'start menu', 'taskbar', 'window', 'app', 'application',
+                    'browser', 'google', 'search', 'navigate', 'go to', 'type', 'press', 'key',
+                    'mouse', 'move', 'scroll', 'find', 'select', 'launch', 'run', 'close',
+                    'settings', 'control panel', 'file', 'folder', 'desktop', 'explorer'
+                ];
+
+                const isComputerUseRequest = computerUseKeywords.some(keyword =>
+                    responseText.toLowerCase().includes(keyword)
+                );
+
+                // Default: Extract commands from the raw response
+                let cmds = extractCommands(responseText);
+
+                // If this LOOKS like computer use, use the Translation Layer to get ROBUST commands
+                // This upgrades "Open Paint" -> "powershell bin/input.ps1 open mspaint"
+                if (isComputerUseRequest) {
+                    try {
+                        // Check if we already have robust commands? 
+                        // Only translate if the raw response didn't give us good code blocks OR if we want to force robustness.
+                        // For now, let's FORCE translation for computer use keywords to ensure UIA hooks are used.
+
+                        setMessages(prev => [...prev, { role: 'system', content: '🧠 **IQ EXCHANGE**: Translating request to robust UIA commands...' }]);
+
+                        const iqSender = async (prompt) => {
+                            if (provider === 'opencode-free') {
+                                const res = await callOpenCodeFree(prompt, freeModel);
+                                return res.response || '';
+                            } else {
+                                // Use Qwen
+                                const qwen = await getQwen();
+                                const res = await qwen.sendMessage(prompt, 'qwen-coder-plus', null, null, 'You are a Command Translator.');
+                                return res.response || '';
+                            }
+                        };
+
+                        const iq = new IQExchange({ sendToAI: iqSender });
+
+                        // Use the processed user message (full text) for context
+                        const robustOps = await iq.translateRequest(processedUserMessage || fullText);
+
+                        if (robustOps && robustOps.length > 0) {
+                            const newCmds = robustOps.map(op => op.content);
+
+                            // Append the translated plan to the chat so the user sees it
+                            const robustBlock = "\n```powershell\n" + newCmds.join("\n") + "\n```";
+                            setMessages(prev => [...prev, { role: 'assistant', content: `**IQ Translation Plan:**${robustBlock}` }]);
+
+                            // OVERRIDE the commands to execute
+                            cmds = newCmds;
+                        }
+                    } catch (err) {
+                        console.error("IQ Translation Error:", err);
+                        setMessages(prev => [...prev, { role: 'error', content: `⚠️ Translation Layer failed: ${err.message}` }]);
+                    }
+                }
+
+                // Auto-Writer extraction (unchanged)
+
                 if (cmds.length > 0) {
                     setDetectedCommands(cmds);
-                    // SMARTX ENGINE: AUTO-APPROVE
-                    if (soloMode) {
+
+                    // IQ EXCHANGE AUTO-HEAL: Check if this is a retry from failed command execution
+                    // The iq_autorun_pending flag is set when commands fail and AI provides corrections
+                    const hasIqAutorunPending = messages.some(m => m.role === 'iq_autorun_pending');
+
+                    if (hasIqAutorunPending) {
+                        // Clear the pending flag to prevent infinite loops
+                        setMessages(prev => prev.filter(m => m.role !== 'iq_autorun_pending'));
+
+                        // Auto-execute the corrected commands from IQ Exchange
+                        setMessages(prev => [...prev, { role: 'system', content: `🔄 **IQ EXCHANGE AUTO-HEAL**: Executing ${cmds.length} corrected command(s)...` }]);
+                        handleExecuteCommands(true, cmds);
+                    } else if (soloMode) {
+                        // SMARTX ENGINE: AUTO-APPROVE (normal flow)
                         setMessages(prev => [...prev, { role: 'system', content: `🤖 **SMARTX ENGINE**: Auto-executing ${cmds.length} detected command(s)...` }]);
                         // Execute immediately, bypassing UI prompt
                         handleExecuteCommands(true, cmds);
@@ -3834,19 +4319,8 @@ const App = () => {
                 break;
             }
 
+            // Command will be normalized by runShellCommandStreaming -> normalizeCommand()
             let finalCmd = cmd;
-
-            // FIX: Robustly handle input.ps1 execution with spaces in path
-            if (cmd.includes('bin/input.ps1') || cmd.includes('bin\\input.ps1')) {
-                const inputScriptAbs = path.join(__dirname, 'input.ps1');
-                // Extract arguments (everything after input.ps1)
-                const parts = cmd.split(/input\.ps1/);
-                const args = parts[1] ? parts[1].trim() : '';
-
-                // Construct robust PowerShell command
-                // syntax: powershell -ExecutionPolicy Bypass -File "path with spaces" arg1 arg2
-                finalCmd = `powershell -NoProfile -ExecutionPolicy Bypass -File "${inputScriptAbs}" ${args}`;
-            }
 
             setMessages(prev => [...prev, { role: 'system', content: `▶ Running: ${finalCmd}` }]);
             setExecutionOutput(prev => [...prev, `> ${finalCmd}`]);
@@ -3886,20 +4360,56 @@ const App = () => {
             setIsExecutingCommands(false);
         }
 
-        // SMARTX ENGINE: AUTO-HEAL
-        // If any command failed, immediately report back to the agent
+        // IQ EXCHANGE SELF-HEALING ENGINE
+        // ALWAYS auto-heal when commands fail - sends errors back to AI
         const failures = results.filter(r => r.failed);
-        if (soloMode && failures.length > 0 && !isCancelled) {
+        if (failures.length > 0 && !isCancelled) {
+            // Check retry limit to prevent infinite loops
+            if (iqRetryCount >= IQ_MAX_RETRIES) {
+                setMessages(prev => [...prev, {
+                    role: 'error',
+                    content: `❌ **IQ EXCHANGE**: Max retries (${IQ_MAX_RETRIES}) reached. Auto-heal stopped to prevent infinite loop.\n\nPlease fix the commands manually and retry.`
+                }]);
+                setIqRetryCount(0); // Reset counter for future attempts
+                return;
+            }
+
+            // Increment retry counter
+            setIqRetryCount(prev => prev + 1);
+
             const errorReport = failures.map(f =>
                 `COMMAND FAILED: \`${f.cmd}\`\nEXIT CODE: ${f.code}\nOUTPUT:\n${f.output}`
             ).join('\n\n');
 
-            const autoPrompt = `🚨 **AUTO-HEAL REPORT** 🚨\nThe following commands failed during execution:\n\n${errorReport}\n\nPlease analyze these errors and provide the CORRECT commands to fix the issue. Do NOT ask for permission, just provide the fix.`;
+            const autoPrompt = `🚨 **IQ EXCHANGE AUTO-HEAL** 🚨
+The following commands failed during execution:
 
-            setMessages(prev => [...prev, { role: 'system', content: `🔄 **SOLO AUTO-HEAL**: Reporting failures to Agent...` }]);
+${errorReport}
+
+ANALYZE the errors and provide CORRECTED commands.
+Common issues:
+- Missing arguments (like app name, coordinates, text)
+- Wrong selector or element name
+- Path issues
+- Missing dependencies
+
+Provide the FIXED commands in code blocks. Do NOT explain, just fix.
+
+IMPORTANT: Generate COMPLETE commands with ALL arguments. Example:
+powershell -NoProfile -ExecutionPolicy Bypass -File "E:/..." open "mspaint.exe"
+powershell -NoProfile -ExecutionPolicy Bypass -File "E:/..." uiclick "Ellipse"
+powershell -NoProfile -ExecutionPolicy Bypass -File "E:/..." drag 200 200 400 400`;
+
+            setMessages(prev => [...prev, { role: 'system', content: `🔄 **IQ EXCHANGE AUTO-HEAL** (Attempt ${iqRetryCount + 1}/${IQ_MAX_RETRIES}): Analyzing errors and generating fix... (commands will auto-run)` }]);
+
+            // Set flag for auto-run of corrected commands - will be checked after AI response
+            setMessages(prev => [...prev, { role: 'iq_autorun_pending', content: 'IQ_AUTORUN' }]);
 
             // Recursive call to AI
             setTimeout(() => handleSubmit(autoPrompt), 100);
+        } else if (failures.length === 0) {
+            // Success! Reset retry counter
+            setIqRetryCount(0);
         }
     };
 
@@ -4629,7 +5139,8 @@ const App = () => {
                         viewHeight: chatHeight - (thinkingLines.length > 0 ? 5 : 0) - 2,  // Adjust for thinking block
                         width: mainWidth - 6,        // Increased safety margin (was -4) to fix "eating" text
                         isActive: appState === 'chat',
-                        isStreaming: isLoading
+                        isStreaming: isLoading,
+                        project: project // Pass project prop
                     })
                 ),
 
