@@ -16,6 +16,11 @@ Run this in your terminal to clone, install dependencies, and build everything a
 git clone https://github.com/roman-ryzenadvanced/OpenQode-Public-Alpha.git; cd OpenQode-Public-Alpha; npm install --legacy-peer-deps; cd bin/goose-ultra-final; npm install --legacy-peer-deps; npm run build; cd ../..; Write-Host "✅ OpenQode is ready. Run OpenQode.bat to start." -ForegroundColor Green
 ```
 
+**macOS / Linux (Bash):**
+```bash
+git clone https://github.com/roman-ryzenadvanced/OpenQode-Public-Alpha.git; cd OpenQode-Public-Alpha; npm install --legacy-peer-deps; cd bin/goose-ultra-final; npm install --legacy-peer-deps; npm run build; cd ../..; echo -e "\033[0;32m✅ OpenQode is ready. Run ./OpenQode.sh to start.\033[0m"
+```
+
 ---
 
 ## 🎯 What is OpenQode?
