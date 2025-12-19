@@ -1,16 +1,65 @@
 /**
  * Responsive Layout Module for OpenQode TUI
- * Handles terminal size breakpoints, sidebar sizing, and layout modes
+ * 
+ * PREMIUM LAYOUT RULES:
+ * 1. Deterministic grid: Sidebar (fixed) | Divider (1) | Main (flex)
+ * 2. Integer widths ONLY (no floating point)
+ * 3. Golden breakpoints: 60/80/100/120+ cols verified
+ * 4. No bordered element with flexGrow (causes stray lines)
+ * 5. One divider between sidebar and main (never ||)
  * 
  * Breakpoints:
- * - Wide: columns >= 120 (full sidebar)
- * - Medium: 90 <= columns < 120 (narrower sidebar)
- * - Narrow: 60 <= columns < 90 (collapsed sidebar, Tab toggle)
- * - Tiny: columns < 60 OR rows < 20 (minimal chrome)
+ * - Tiny: cols < 60 (no sidebar, minimal chrome)
+ * - Narrow: 60 <= cols < 80 (sidebar collapsed by default)
+ * - Medium: 80 <= cols < 100 (compact sidebar)
+ * - Wide: cols >= 100 (full sidebar)
  */
 
 import stringWidth from 'string-width';
 import cliTruncate from 'cli-truncate';
+
+// ═══════════════════════════════════════════════════════════════
+// GOLDEN BREAKPOINTS (verified layouts)
+// ═══════════════════════════════════════════════════════════════
+export const BREAKPOINTS = {
+    TINY: 60,
+    NARROW: 80,
+    MEDIUM: 100,
+    WIDE: 120
+};
+
+// ═══════════════════════════════════════════════════════════════
+// FIXED LAYOUT DIMENSIONS (integers only)
+// ═══════════════════════════════════════════════════════════════
+export const FIXED = {
+    // Divider between sidebar and main
+    DIVIDER_WIDTH: 1,
+
+    // Outer frame borders
+    FRAME_LEFT: 1,
+    FRAME_RIGHT: 1,
+
+    // Sidebar widths per breakpoint
+    SIDEBAR: {
+        TINY: 0,
+        NARROW: 0,      // Collapsed by default
+        NARROW_EXPANDED: 22,
+        MEDIUM: 24,
+        WIDE: 28
+    },
+
+    // Input bar (NEVER changes height)
+    INPUT_HEIGHT: 3,
+
+    // Status strip
+    STATUS_HEIGHT: 1,
+
+    // Minimum main content width
+    MIN_MAIN_WIDTH: 40,
+
+    // Max readable line width (prevent edge-to-edge text)
+    MAX_LINE_WIDTH: 90
+};
 
 // ═══════════════════════════════════════════════════════════════
 // LAYOUT MODE DETECTION
@@ -18,67 +67,82 @@ import cliTruncate from 'cli-truncate';
 
 /**
  * Compute layout mode based on terminal dimensions
+ * Returns explicit integer widths for all regions
+ * 
  * @param {number} cols - Terminal columns
  * @param {number} rows - Terminal rows
- * @returns {Object} Layout configuration
+ * @returns {Object} Layout configuration with exact pixel widths
  */
 export function computeLayoutMode(cols, rows) {
-    const c = cols ?? 80;
-    const r = rows ?? 24;
+    const c = Math.floor(cols ?? 80);
+    const r = Math.floor(rows ?? 24);
 
     // Tiny mode: very small terminal
-    if (c < 60 || r < 20) {
+    if (c < BREAKPOINTS.TINY || r < 20) {
         return {
             mode: 'tiny',
             cols: c,
             rows: r,
             sidebarWidth: 0,
+            dividerWidth: 0,
+            mainWidth: c - FIXED.FRAME_LEFT - FIXED.FRAME_RIGHT,
             sidebarCollapsed: true,
             showBorders: false,
-            paddingX: 0,
-            paddingY: 0
+            showSidebar: false,
+            transcriptHeight: r - FIXED.INPUT_HEIGHT - FIXED.STATUS_HEIGHT - 2
         };
     }
 
-    // Narrow mode: sidebar collapsed by default but toggleable
-    if (c < 90) {
+    // Narrow mode: sidebar collapsed by default
+    if (c < BREAKPOINTS.NARROW) {
+        const mainWidth = c - FIXED.FRAME_LEFT - FIXED.FRAME_RIGHT;
         return {
             mode: 'narrow',
             cols: c,
             rows: r,
-            sidebarWidth: 0, // collapsed by default
+            sidebarWidth: 0, // collapsed default
+            sidebarExpandedWidth: FIXED.SIDEBAR.NARROW_EXPANDED,
+            dividerWidth: 0,
+            mainWidth: mainWidth,
             sidebarCollapsedDefault: true,
-            sidebarExpandedWidth: Math.min(24, Math.floor(c * 0.28)),
             showBorders: true,
-            paddingX: 1,
-            paddingY: 0
+            showSidebar: false,
+            transcriptHeight: r - FIXED.INPUT_HEIGHT - FIXED.STATUS_HEIGHT - 2
         };
     }
 
-    // Medium mode: narrower sidebar
-    if (c < 120) {
+    // Medium mode: compact sidebar
+    if (c < BREAKPOINTS.WIDE) {
+        const sidebarWidth = FIXED.SIDEBAR.MEDIUM;
+        const mainWidth = c - sidebarWidth - FIXED.DIVIDER_WIDTH - FIXED.FRAME_LEFT - FIXED.FRAME_RIGHT;
         return {
             mode: 'medium',
             cols: c,
             rows: r,
-            sidebarWidth: Math.min(26, Math.floor(c * 0.25)),
+            sidebarWidth: sidebarWidth,
+            dividerWidth: FIXED.DIVIDER_WIDTH,
+            mainWidth: Math.max(FIXED.MIN_MAIN_WIDTH, mainWidth),
             sidebarCollapsed: false,
             showBorders: true,
-            paddingX: 1,
-            paddingY: 0
+            showSidebar: true,
+            transcriptHeight: r - FIXED.INPUT_HEIGHT - FIXED.STATUS_HEIGHT - 2
         };
     }
 
     // Wide mode: full sidebar
+    const sidebarWidth = FIXED.SIDEBAR.WIDE;
+    const mainWidth = c - sidebarWidth - FIXED.DIVIDER_WIDTH - FIXED.FRAME_LEFT - FIXED.FRAME_RIGHT;
     return {
         mode: 'wide',
         cols: c,
         rows: r,
-        sidebarWidth: Math.min(32, Math.floor(c * 0.25)),
+        sidebarWidth: sidebarWidth,
+        dividerWidth: FIXED.DIVIDER_WIDTH,
+        mainWidth: Math.max(FIXED.MIN_MAIN_WIDTH, mainWidth),
         sidebarCollapsed: false,
         showBorders: true,
-        paddingX: 1,
-        paddingY: 0
+        showSidebar: true,
+        transcriptHeight: r - FIXED.INPUT_HEIGHT - FIXED.STATUS_HEIGHT - 2
     };
 }
 
@@ -90,32 +154,36 @@ export function computeLayoutMode(cols, rows) {
  * Get sidebar width for current mode and toggle state
  * @param {Object} layout - Layout configuration
  * @param {boolean} isExpanded - Whether sidebar is manually expanded
- * @returns {number} Sidebar width in columns
+ * @returns {number} Sidebar width in columns (integer)
  */
 export function getSidebarWidth(layout, isExpanded) {
     if (layout.mode === 'tiny') return 0;
 
     if (layout.mode === 'narrow') {
-        return isExpanded ? (layout.sidebarExpandedWidth || 24) : 0;
+        return isExpanded ? (layout.sidebarExpandedWidth || FIXED.SIDEBAR.NARROW_EXPANDED) : 0;
     }
 
     return layout.sidebarWidth;
 }
 
 /**
- * Get main content width
+ * Get main content width (with optional sidebar toggle state)
  * @param {Object} layout - Layout configuration
- * @param {number} sidebarWidth - Current sidebar width
- * @returns {number} Main content width
+ * @param {number} currentSidebarWidth - Current sidebar width
+ * @returns {number} Main content width (integer)
  */
-export function getMainWidth(layout, sidebarWidth) {
-    const borders = sidebarWidth > 0 ? 6 : 4; // increased safety margin (was 4:2, now 6:4)
-    return Math.max(20, layout.cols - sidebarWidth - borders);
+export function getMainWidth(layout, currentSidebarWidth) {
+    const divider = currentSidebarWidth > 0 ? FIXED.DIVIDER_WIDTH : 0;
+    const available = layout.cols - currentSidebarWidth - divider - FIXED.FRAME_LEFT - FIXED.FRAME_RIGHT;
+    return Math.max(FIXED.MIN_MAIN_WIDTH, Math.floor(available));
 }
 
-// ═══════════════════════════════════════════════════════════════
-// TEXT UTILITIES (using string-width for accuracy)
-// ═══════════════════════════════════════════════════════════════
+/**
+ * Get clamped content width for readable text
+ */
+export function getContentWidth(mainWidth) {
+    return Math.min(mainWidth - 2, FIXED.MAX_LINE_WIDTH);
+}
 
 /**
  * Truncate text to fit width (unicode-aware)

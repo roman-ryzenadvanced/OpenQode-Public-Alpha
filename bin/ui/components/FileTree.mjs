@@ -25,6 +25,7 @@ const sortFiles = (files, dirPath) => {
 const FileTree = ({
     rootPath,
     onSelect,
+    onOpen,
     selectedFiles = new Set(),
     isActive = false,
     height = 20,
@@ -102,6 +103,11 @@ const FileTree = ({
             if (item && item.isDir) {
                 if (!expanded.has(item.path)) {
                     setExpanded(prev => new Set([...prev, item.path]));
+                }
+            } else if (key.return) {
+                const selectedItem = flatList[currentIndex];
+                if (selectedItem && !selectedItem.isDir && typeof onOpen === 'function') {
+                    onOpen(selectedItem.path);
                 }
             }
         }

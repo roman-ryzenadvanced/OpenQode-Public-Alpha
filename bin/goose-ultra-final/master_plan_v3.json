@@ -1,0 +1,216 @@
+{
+    "meta": {
+        "version": "3.0",
+        "codename": "Goose Ultra Complete Architecture",
+        "objective": "Implement SAP + 4 Critical Layers to eliminate broken frontends, skipped approvals, cross-talk, and redesign drift.",
+        "prerequisite": "SAP (Layer 0) is already implemented."
+    },
+    "layers": {
+        "LAYER_0_SAP": {
+            "status": "DONE",
+            "description": "Streaming Artifact Protocol with XML parsing and legacy fallback."
+        },
+        "LAYER_1_PLAN_FIRST_STATE_MACHINE": {
+            "rule": "Idea submission must generate a plan first; build is forbidden until user approves.",
+            "state_machine": {
+                "states": [
+                    "IDLE",
+                    "PLANNING",
+                    "PLAN_READY",
+                    "BUILDING",
+                    "PREVIEW_READY",
+                    "ERROR"
+                ],
+                "transitions": [
+                    {
+                        "from": "IDLE",
+                        "to": "PLANNING",
+                        "event": "SUBMIT_IDEA"
+                    },
+                    {
+                        "from": "PLANNING",
+                        "to": "PLAN_READY",
+                        "event": "PLAN_COMPLETE"
+                    },
+                    {
+                        "from": "PLAN_READY",
+                        "to": "BUILDING",
+                        "event": "APPROVE_PLAN"
+                    },
+                    {
+                        "from": "PLAN_READY",
+                        "to": "PLANNING",
+                        "event": "EDIT_PLAN"
+                    },
+                    {
+                        "from": "PLAN_READY",
+                        "to": "IDLE",
+                        "event": "REJECT_PLAN"
+                    },
+                    {
+                        "from": "BUILDING",
+                        "to": "PREVIEW_READY",
+                        "event": "BUILD_SUCCESS"
+                    },
+                    {
+                        "from": "BUILDING",
+                        "to": "ERROR",
+                        "event": "BUILD_FAIL"
+                    }
+                ]
+            },
+            "hard_guards": [
+                "No BUILDING transition without APPROVE_PLAN event",
+                "Approve button disabled until PLAN_COMPLETE event received"
+            ],
+            "implementation": {
+                "files": [
+                    "src/types.ts",
+                    "src/orchestrator.ts",
+                    "src/components/Views.tsx"
+                ],
+                "actions": [
+                    "Add PLAN_READY state to OrchestratorState enum",
+                    "Update reducer to enforce transition guards",
+                    "Disable Approve button when state !== PLAN_READY"
+                ]
+            }
+        },
+        "LAYER_2_SESSION_GATING": {
+            "rule": "Prevent cross-talk: only the active sessionId may update UI or write files.",
+            "requirements": [
+                "Every stream handler receives and checks sessionId",
+                "UI ignores events where sessionId !== state.activeSessionId",
+                "CANCEL_SESSION action marks session as cancelled",
+                "Single finalize path via COMPLETE/ERROR/CANCEL/TIMEOUT"
+            ],
+            "implementation": {
+                "files": [
+                    "src/orchestrator.ts",
+                    "src/components/Views.tsx",
+                    "src/components/LayoutComponents.tsx"
+                ],
+                "actions": [
+                    "Add activeSessionId, cancelledSessions to state",
+                    "Add START_SESSION, END_SESSION, CANCEL_SESSION actions",
+                    "Wrap all onChatChunk/Complete/Error handlers with session check",
+                    "Add 30s timeout watchdog"
+                ]
+            }
+        },
+        "LAYER_3_PATCH_ONLY_MODIFICATIONS": {
+            "rule": "Existing project edits must be patch-based; no full regeneration.",
+            "patch_format": {
+                "schema": {
+                    "patches": [
+                        {
+                            "op": "replace|insert_before|insert_after|delete",
+                            "anchor": "string",
+                            "content": "string"
+                        }
+                    ]
+                },
+                "constraints": {
+                    "max_lines_per_patch": 500,
+                    "forbidden_zones": [
+                        "<head>",
+                        "<!DOCTYPE"
+                    ]
+                }
+            },
+            "redesign_gate": {
+                "rule": "Full regeneration blocked unless user says 'redesign' or 'rebuild from scratch'",
+                "implementation": "Check prompt for REDESIGN_OK keywords (case-insensitive)"
+            },
+            "implementation": {
+                "files": [
+                    "src/services/PatchApplier.ts (NEW)",
+                    "src/services/automationService.ts"
+                ],
+                "actions": [
+                    "Create PatchApplier class with apply() method",
+                    "Update modification prompt to request patch JSON",
+                    "Integrate with applyPlanToExistingHtml()"
+                ]
+            }
+        },
+        "LAYER_4_QUALITY_AND_TASK_MATCH_GUARDS": {
+            "rule": "Block broken UI and wrong-app output before writing or previewing.",
+            "quality_gates": [
+                {
+                    "name": "artifact_type_gate",
+                    "check": "No [PLAN] markers or prose without HTML"
+                },
+                {
+                    "name": "html_validity_gate",
+                    "check": "Has DOCTYPE, <html>, <body>"
+                },
+                {
+                    "name": "styling_presence_gate",
+                    "check": "Has Tailwind CDN or >20 CSS rules"
+                },
+                {
+                    "name": "runtime_sanity_gate",
+                    "check": "No console errors in sandboxed render"
+                }
+            ],
+            "task_match_gate": {
+                "rule": "Block if requestType !== outputType",
+                "implementation": [
+                    "Extract keywords from original prompt",
+                    "Analyze generated HTML for matching content",
+                    "If mismatch score > 0.7, block and retry"
+                ]
+            },
+            "auto_repair": {
+                "max_attempts": 2,
+                "retry_payload": "failure_reasons + original_request + project_context"
+            },
+            "implementation": {
+                "files": [
+                    "src/services/automationService.ts"
+                ],
+                "actions": [
+                    "Extend runQualityGates() with task_match_gate",
+                    "Add keyword extraction helper",
+                    "Add retry logic with mismatch reason"
+                ]
+            }
+        }
+    },
+    "implementation_phases": [
+        {
+            "phase": 1,
+            "layer": "PLAN_FIRST_STATE_MACHINE",
+            "priority": "CRITICAL"
+        },
+        {
+            "phase": 2,
+            "layer": "SESSION_GATING",
+            "priority": "CRITICAL"
+        },
+        {
+            "phase": 3,
+            "layer": "PATCH_ONLY_MODIFICATIONS",
+            "priority": "HIGH"
+        },
+        {
+            "phase": 4,
+            "layer": "QUALITY_AND_TASK_MATCH_GUARDS",
+            "priority": "HIGH"
+        },
+        {
+            "phase": 5,
+            "name": "Integration Testing",
+            "priority": "REQUIRED"
+        }
+    ],
+    "definition_of_done": [
+        "SAP implemented (DONE)",
+        "No build starts without plan approval",
+        "No cross-talk between sessions",
+        "Small changes do not redesign apps",
+        "Broken/unstyled outputs are blocked and repaired before preview",
+        "Wrong-app outputs are blocked (task-match gate)"
+    ]
+}

@@ -1,90 +1,174 @@
 #!/bin/bash
-# OpenQode v1.3 Alpha - Linux/Mac Launcher
+# OpenQode v1.01 - Unified Launcher for macOS/Linux
+# ===================================================
 
-# Auto-Install Logic
-PWD=$(dirname "$0")
-cd "$PWD"
+set -e
+cd "$(dirname "$0")"
 
-echo "========================================"
-echo "  OpenQode Auto-Check"
-echo "========================================"
+# Colors
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+CYAN='\033[0;36m'
+NC='\033[0m' # No Color
 
-if [ ! -d "node_modules" ]; then
-    echo "[INFO] First run detected! Installing dependencies..."
-    npm install --legacy-peer-deps
-    if [ $? -ne 0 ]; then
-        echo "[ERROR] Failed to install dependencies. Please install Node.js."
-        exit 1
-    fi
-    echo "[SUCCESS] Dependencies installed!"
-    echo ""
-fi
-
-# Check Qwen authentication
-echo "[INFO] Checking Qwen authentication..."
-node bin/auth-check.mjs
+echo ""
+echo -e "${CYAN}========================================"
+echo "  OpenQode v1.01 - AI Coding Assistant"
+echo -e "========================================${NC}"
 echo ""
 
-# Functions
-pause() {
+# Check Node.js
+if ! command -v node &> /dev/null; then
+    echo -e "${RED}ERROR: Node.js is not installed!${NC}"
+    echo "Please run the install script first:"
+    echo "  macOS:  ./install-macos.sh"
+    echo "  Linux:  ./install-linux.sh"
+    exit 1
+fi
+echo -e "${GREEN}[OK]${NC} Node.js $(node --version) detected"
+
+# Install dependencies if needed
+if [ ! -d "node_modules" ]; then
+    echo -e "${YELLOW}[INFO]${NC} First run - Installing dependencies..."
+    npm install --legacy-peer-deps 2>/dev/null || npm install
+fi
+
+if [ ! -d "bin/goose-ultra-final/node_modules" ]; then
+    echo -e "${YELLOW}[INFO]${NC} Installing Goose Ultra dependencies..."
+    pushd bin/goose-ultra-final > /dev/null
+    npm install --legacy-peer-deps 2>/dev/null || npm install
+    popd > /dev/null
+fi
+echo -e "${GREEN}[OK]${NC} Dependencies ready"
+
+show_menu() {
+    clear
+    echo ""
+    echo -e "${CYAN}========================================"
+    echo "  OPENQODE v1.01 - LAUNCH MENU"
+    echo -e "========================================${NC}"
+    echo ""
+    echo "  RECOMMENDED:"
+    echo "  [1] *** GOOSE ULTRA *** (Full IDE Experience)"
+    echo "  [2] GOOSE ULTRA DEV (Live Reload Mode)"
+    echo ""
+    echo "  TERMINAL INTERFACES:"
+    echo "  [3] Next-Gen TUI (Gen 5 - Ink)"
+    echo "  [4] TUI Classic (Gen 4 - Node.js)"
+    echo ""
+    echo "  TOOLS:"
+    echo "  [5] Qwen Authentication (Login/Refresh)"
+    echo "  [8] Smart Repair (Fix TUI crashes)"
+    echo "  [9] Check Updates"
+    echo ""
+    echo "  [0] Exit"
+    echo ""
+}
+
+launch_goose() {
+    echo ""
+    echo -e "${CYAN}========================================${NC}"
+    echo "  GOOSE ULTRA - Production Mode"
+    echo -e "${CYAN}========================================${NC}"
+    echo ""
+    echo "Building Goose Ultra..."
+    
+    pushd bin/goose-ultra-final > /dev/null
+    
+    if ! npm run build; then
+        echo -e "${YELLOW}[WARNING]${NC} Build failed, attempting recovery..."
+        npm install --legacy-peer-deps
+        npm run build
+    fi
+    
+    echo ""
+    echo "Starting Goose Ultra..."
+    npx electron . &
+    popd > /dev/null
+    
+    echo ""
+    echo -e "${GREEN}Goose Ultra launched!${NC} Check for the window."
+    sleep 2
+}
+
+launch_goose_dev() {
+    echo ""
+    echo -e "${CYAN}========================================${NC}"
+    echo "  GOOSE ULTRA DEV MODE"
+    echo -e "${CYAN}========================================${NC}"
+    echo ""
+    
+    pushd bin/goose-ultra-final > /dev/null
+    npm run dev &
+    sleep 5
+    GOOSE_DEV=true npx electron . &
+    popd > /dev/null
+    
+    echo ""
+    echo -e "${GREEN}Dev mode started!${NC} Edits will hot-reload."
+    sleep 2
+}
+
+launch_ink_tui() {
+    echo ""
+    echo "Starting Next-Gen TUI (Gen 5)..."
+    node bin/auth-check.mjs --quiet 2>/dev/null || true
+    node --experimental-require-module bin/opencode-ink.mjs
     read -p "Press Enter to continue..."
 }
 
-start_webgui() {
-    echo "Starting Web GUI..."
-    node server.js 15044 &
-    SERVER_PID=$!
-    sleep 2
-    if command -v xdg-open &> /dev/null; then xdg-open http://localhost:15044; elif command -v open &> /dev/null; then open http://localhost:15044; fi
-    wait $SERVER_PID
-}
-
-start_qwentui() {
-    if ! command -v qwen &> /dev/null; then
-        echo "Error: qwen CLI not found. Install with: npm install -g @anthropic/qwen-code"
-        pause
-        return
-    fi
-    qwen
-}
-
-start_nodetui() {
-    echo "Starting Classic TUI..."
+launch_classic_tui() {
+    echo ""
+    echo "Starting TUI Classic (Gen 4)..."
     node bin/opencode-tui.cjs
+    read -p "Press Enter to continue..."
 }
 
-start_inktui() {
-    echo "Starting Next-Gen TUI..."
-    node bin/opencode-ink.mjs
+qwen_auth() {
+    echo ""
+    echo -e "${CYAN}========================================${NC}"
+    echo "  QWEN AUTHENTICATION"
+    echo -e "${CYAN}========================================${NC}"
+    echo ""
+    echo "Starting Qwen authentication flow..."
+    echo ""
+    node bin/auth.js
+    read -p "Press Enter to continue..."
 }
 
-# Menu Loop
+smart_repair() {
+    echo ""
+    echo "Running Smart Repair..."
+    node bin/smart-repair.mjs
+    read -p "Press Enter to continue..."
+}
+
+check_updates() {
+    echo ""
+    echo "Checking for updates..."
+    if git pull 2>/dev/null; then
+        echo -e "${GREEN}[OK]${NC} Repository updated! Please restart the launcher."
+    else
+        echo -e "${YELLOW}[INFO]${NC} Git not available or not a git repository."
+    fi
+    read -p "Press Enter to continue..."
+}
+
+# Main loop
 while true; do
-    clear
-    echo "========================================"
-    echo "  OpenQode v1.3 Alpha"
-    echo "========================================"
-    echo ""
-    echo "  [1] Web GUI"
-    echo "  [2] Qwen TUI (CLI)"
-    echo "  [3] (Windows Only Feature)"
-    echo "  [4] TUI Classic (Gen 4)"
-    echo "  [5] ★ NEXT-GEN TUI (Gen 5) - Recommended!"
-    echo "  [6] Agent Manager"
-    echo "  [7] 🔧 Smart Repair (Fix TUI crashes)"
-    echo "  [8] Exit"
-    echo ""
-    read -p "Enter choice: " choice
-
+    show_menu
+    read -p "Enter choice (0-9): " choice
+    
     case $choice in
-        1) start_webgui ;;
-        2) start_qwentui ;;
-        3) echo "Not available on Mac/Linux."; pause ;;
-        4) start_nodetui ;;
-        5) start_inktui ;;
-        6) echo "Use Windows version for Agent Manager (or edit files manually)"; pause ;;
-        7) echo "Starting Smart Repair..."; node bin/smart-repair.mjs ;;
-        8) exit 0 ;;
-        *) echo "Invalid choice"; pause ;;
+        1) launch_goose ;;
+        2) launch_goose_dev ;;
+        3) launch_ink_tui ;;
+        4) launch_classic_tui ;;
+        5) qwen_auth ;;
+        8) smart_repair ;;
+        9) check_updates ;;
+        0) echo ""; echo "Goodbye!"; exit 0 ;;
+        *) echo "Invalid choice."; sleep 1 ;;
     esac
 done

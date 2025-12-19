@@ -1,0 +1,56 @@
+{
+    "meta": {
+        "version": "2.0",
+        "codename": "Goose Ultra SAP (Streaming Artifact Protocol)",
+        "target_platform": "Goose Ultra / Electron Shim",
+        "objective": "Eliminate malformed code generation and prose pollution in AI output."
+    },
+    "architecture": {
+        "protocol": "Streaming Artifact Protocol (SAP)",
+        "format": "XML-based structured stream (inspired by Bolt/Claude Artifacts)",
+        "tags": {
+            "artifact_container": "goose_artifact",
+            "file_unit": "goose_file",
+            "shell_action": "goose_action",
+            "thought_chain": "goose_thought"
+        }
+    },
+    "implementation_steps": [
+        {
+            "step": 1,
+            "component": "Parser",
+            "action": "Implement StateMachineParser",
+            "details": "Create a class that implements a char-by-char state machine (WAITING -> TAG_OPEN -> CONTENT -> TAG_CLOSE). Must handle CDATA sections to prevent double-escaping of HTML entities.",
+            "file": "src/services/ArtifactParser.ts"
+        },
+        {
+            "step": 2,
+            "component": "SystemPrompt",
+            "action": "Hard-Enforce XML Schema",
+            "details": "Update 'MODERN_TEMPLATE_PROMPT' to strictly forbid markdown code blocks (```) and require <goose_file> tags. Add 'negative constraints' against conversational prose outside of <goose_thought> tags.",
+            "file": "src/services/automationService.ts"
+        },
+        {
+            "step": 3,
+            "component": "Orchestrator",
+            "action": "Stream Transformation",
+            "details": "Pipe the raw LLM stream through the ArtifactParser. Update 'redux' state only with the 'clean' file content, discarding the raw chat buffer.",
+            "file": "src/components/Views.tsx"
+        },
+        {
+            "step": 4,
+            "component": "Validation",
+            "action": "Pre-Write Validation",
+            "details": "Before writing to disk: 1. Validate XML structure. 2. Check for missing closing tags. 3. Ensure critical files (index.html) are present.",
+            "file": "src/services/automationService.ts"
+        }
+    ],
+    "prompt_engineering": {
+        "xml_template": "<goose_artifact id=\"{id}\">\n  <goose_file path=\"{path}\">\n    <![CDATA[\n      {content}\n    ]]>\n  </goose_file>\n</goose_artifact>",
+        "constraints": [
+            "NO markdown code blocks",
+            "NO conversational text outside <goose_thought>",
+            "ALL code must be CDATA wrapped"
+        ]
+    }
+}

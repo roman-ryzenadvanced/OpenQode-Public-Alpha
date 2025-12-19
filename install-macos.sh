@@ -1,108 +1,170 @@
 #!/bin/bash
-# ╔══════════════════════════════════════════════════════════════════╗
-# ║  OpenQode TUI - Full Auto Installer (macOS)                       ║
-# ║  This script installs EVERYTHING needed - just run it!            ║
-# ╚══════════════════════════════════════════════════════════════════╝
+# ========================================================
+# OpenQode v1.01 - Automated Installer for macOS
+# ========================================================
 
 set -e
+cd "$(dirname "$0")"
 
-echo ""
-echo "╔══════════════════════════════════════════════════════════════╗"
-echo "║       OpenQode TUI - macOS Auto Installer                    ║"
-echo "║       This will install all required dependencies            ║"
-echo "╚══════════════════════════════════════════════════════════════╝"
-echo ""
-
-# Colors for output
+# Colors
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
-NC='\033[0m' # No Color
+CYAN='\033[0;36m'
+BOLD='\033[1m'
+NC='\033[0m'
 
-success() { echo -e "${GREEN}[✓]${NC} $1"; }
-warning() { echo -e "${YELLOW}[!]${NC} $1"; }
-error() { echo -e "${RED}[X]${NC} $1"; }
-info() { echo -e "    $1"; }
+echo ""
+echo -e "${CYAN}========================================================"
+echo "  OpenQode v1.01 - AUTOMATED INSTALLATION WIZARD"
+echo -e "========================================================${NC}"
+echo ""
+echo "  This installer will set up everything you need:"
+echo "  - Homebrew (if not installed)"
+echo "  - Node.js (if not installed)"
+echo "  - All dependencies"
+echo "  - Goose Ultra IDE"
+echo ""
+read -p "Press Enter to start installation..."
+echo ""
 
-# Step 1: Check for Homebrew
-echo "[1/6] Checking for Homebrew..."
+# ========================================================
+# HOMEBREW CHECK AND INSTALL
+# ========================================================
+echo -e "${BOLD}[STEP 1/5]${NC} Checking Homebrew..."
 if ! command -v brew &> /dev/null; then
-    warning "Homebrew not found. Installing..."
+    echo -e "${YELLOW}[INFO]${NC} Homebrew not found. Installing..."
     /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
     
-    # Add Homebrew to PATH for this session
-    if [[ -f "/opt/homebrew/bin/brew" ]]; then
+    # Add brew to PATH for this session (Apple Silicon)
+    if [[ -f /opt/homebrew/bin/brew ]]; then
         eval "$(/opt/homebrew/bin/brew shellenv)"
-    elif [[ -f "/usr/local/bin/brew" ]]; then
+    elif [[ -f /usr/local/bin/brew ]]; then
         eval "$(/usr/local/bin/brew shellenv)"
     fi
-    success "Homebrew installed!"
+    
+    echo -e "${GREEN}[OK]${NC} Homebrew installed"
 else
-    success "Homebrew found: $(brew --version | head -1)"
+    echo -e "${GREEN}[OK]${NC} Homebrew detected"
 fi
 
-# Step 2: Check for Node.js
-echo "[2/6] Checking for Node.js..."
+# ========================================================
+# NODE.JS CHECK AND INSTALL
+# ========================================================
+echo -e "${BOLD}[STEP 2/5]${NC} Checking Node.js..."
 if ! command -v node &> /dev/null; then
-    warning "Node.js not found. Installing via Homebrew..."
+    echo -e "${YELLOW}[INFO]${NC} Node.js not found. Installing via Homebrew..."
     brew install node
-    success "Node.js installed!"
+    echo -e "${GREEN}[OK]${NC} Node.js installed"
 else
-    success "Node.js found: $(node --version)"
+    NODE_VER=$(node --version)
+    echo -e "${GREEN}[OK]${NC} Node.js $NODE_VER detected"
 fi
 
-# Step 3: Check for npm
-echo "[3/6] Checking for npm..."
+# ========================================================
+# NPM CHECK
+# ========================================================
+echo -e "${BOLD}[STEP 3/5]${NC} Checking npm..."
 if ! command -v npm &> /dev/null; then
-    error "npm not found. Please reinstall Node.js"
-    exit 1
+    echo -e "${RED}[ERROR]${NC} npm not found! Reinstalling Node.js..."
+    brew reinstall node
+fi
+NPM_VER=$(npm --version)
+echo -e "${GREEN}[OK]${NC} npm $NPM_VER detected"
+
+# ========================================================
+# ROOT DEPENDENCIES
+# ========================================================
+echo -e "${BOLD}[STEP 4/5]${NC} Installing root dependencies..."
+if [ -d "node_modules" ]; then
+    echo -e "${GREEN}[OK]${NC} Root dependencies already installed"
 else
-    success "npm found: $(npm --version)"
+    echo -e "${YELLOW}[INFO]${NC} Running npm install..."
+    npm install --legacy-peer-deps 2>/dev/null || npm install
+    echo -e "${GREEN}[OK]${NC} Root dependencies installed"
 fi
 
-# Step 4: Install Node.js dependencies
-echo "[4/6] Installing Node.js dependencies..."
-npm install --legacy-peer-deps
-if [ $? -ne 0 ]; then
-    warning "Some npm packages failed. Trying with force..."
-    npm install --force --legacy-peer-deps
+# ========================================================
+# GOOSE ULTRA DEPENDENCIES
+# ========================================================
+echo -e "${BOLD}[STEP 5/5]${NC} Installing Goose Ultra IDE dependencies..."
+if [ -d "bin/goose-ultra-final/node_modules" ]; then
+    echo -e "${GREEN}[OK]${NC} Goose Ultra dependencies already installed"
+else
+    pushd bin/goose-ultra-final > /dev/null
+    echo -e "${YELLOW}[INFO]${NC} Running npm install in Goose Ultra..."
+    npm install --legacy-peer-deps 2>/dev/null || npm install
+    
+    # Pre-build
+    echo -e "${YELLOW}[INFO]${NC} Pre-building Goose Ultra..."
+    npm run build 2>/dev/null || true
+    popd > /dev/null
+    echo -e "${GREEN}[OK]${NC} Goose Ultra dependencies installed"
 fi
-# Ensure critical markdown dependencies
-npm install unified remark-parse remark-gfm remark-rehype rehype-stringify ink-syntax-highlight diff --save --legacy-peer-deps
-success "Node.js dependencies installed!"
 
-# Step 5: Install Playwright
-echo "[5/6] Installing Playwright browser automation..."
-npm install playwright
-if [ $? -ne 0 ]; then
-    warning "Playwright npm install had issues. Continuing..."
+# ========================================================
+# MAKE SCRIPTS EXECUTABLE
+# ========================================================
+chmod +x OpenQode.sh 2>/dev/null || true
+chmod +x install-linux.sh 2>/dev/null || true
+chmod +x install.sh 2>/dev/null || true
+chmod +x start.sh 2>/dev/null || true
+
+# ========================================================
+# VERIFICATION
+# ========================================================
+echo ""
+echo -e "${CYAN}========================================================"
+echo "  INSTALLATION COMPLETE"
+echo -e "========================================================${NC}"
+echo ""
+echo "  Checking installation..."
+
+ERRORS=0
+
+if command -v node &> /dev/null; then
+    echo -e "  ${GREEN}[OK]${NC} Node.js"
+else
+    echo -e "  ${RED}[FAIL]${NC} Node.js"
+    ((ERRORS++))
 fi
 
-# Step 6: Install Playwright browsers
-echo "[6/6] Downloading Chromium browser for Playwright..."
-npx playwright install chromium
-if [ $? -ne 0 ]; then
-    warning "Playwright browser download failed."
-    info "You can try manually: npx playwright install chromium"
+if command -v npm &> /dev/null; then
+    echo -e "  ${GREEN}[OK]${NC} npm"
+else
+    echo -e "  ${RED}[FAIL]${NC} npm"
+    ((ERRORS++))
 fi
-success "Playwright installed!"
 
-# Verify installation
-echo ""
-echo "Checking dependencies:"
-command -v node &> /dev/null && success "Node.js" || error "Node.js"
-command -v npm &> /dev/null && success "npm" || error "npm"
-[ -d "node_modules/playwright" ] && success "Playwright" || warning "Playwright (may need manual install)"
-[ -d "node_modules/ink" ] && success "Ink (TUI framework)" || warning "Ink not found - run 'npm install'"
+if [ -d "node_modules" ]; then
+    echo -e "  ${GREEN}[OK]${NC} Root dependencies"
+else
+    echo -e "  ${RED}[FAIL]${NC} Root dependencies"
+    ((ERRORS++))
+fi
+
+if [ -d "bin/goose-ultra-final/node_modules" ]; then
+    echo -e "  ${GREEN}[OK]${NC} Goose Ultra dependencies"
+else
+    echo -e "  ${RED}[FAIL]${NC} Goose Ultra dependencies"
+    ((ERRORS++))
+fi
 
 echo ""
-echo "══════════════════════════════════════════════════════════════════"
-echo "  Installation Complete!"
-echo ""
-echo "  To start OpenQode TUI, run:"
-echo "    node bin/opencode-ink.mjs"
-echo ""
-echo "  Or use the shortcut:"
-echo "    npm start"
-echo "══════════════════════════════════════════════════════════════════"
-echo ""
+if [ $ERRORS -eq 0 ]; then
+    echo -e "  ${GREEN}==========================================="
+    echo "  ALL CHECKS PASSED! Ready to launch."
+    echo -e "  ===========================================${NC}"
+    echo ""
+    echo "  Run ./OpenQode.sh to start the application!"
+    echo ""
+else
+    echo -e "  ${RED}==========================================="
+    echo "  SOME CHECKS FAILED ($ERRORS errors)"
+    echo -e "  ===========================================${NC}"
+    echo ""
+    echo "  Try running this installer again."
+    echo ""
+fi
+
+exit $ERRORS

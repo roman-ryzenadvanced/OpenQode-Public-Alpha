@@ -1,125 +1,80 @@
-# API Keys and sensitive data
+# ============================================
+# OpenQode v1.01 - Git Ignore
+# ============================================
+
+# === SENSITIVE DATA ===
 *.key
 *.pem
 auth.json
 credentials.json
 .env
-.env.local
-.env.*.local
+.env.*
 config.json
 secrets.json
 tokens.json
 sessions.json
 .qwen-tokens.json
-config.js
 config.cjs
+config.mjs
 
-# Session logs and chat history
-.opencode/session_log.md
+# === SESSION DATA ===
 session-*.md
 *session*.md
 session_logs/
 chat_logs/
+.opencode/session_log.md
+.opencode/recent_projects.json
 
-# Config & Backup
-config.mjs
+# === LOGS ===
+*.log
+logs/
+
+# === TEMP FILES ===
 *.bak
 *.old
 *.tmp
-qwen-oauth.mjs.bak
+*.backup
+*.enhanced_backup
+temp/
+tmp/
 
-# All log files
-*.log
-server*.log
-*_output.log
-*_debug.log
-*_clean.log
-
-# Vercel
-.vercel/
-
-
-# Large binaries (use Git LFS or download separately)
-*.exe
-bin/opencode.exe
-
-# Node.js
-node_modules/
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-
-# Build outputs
+# === BUILD OUTPUTS ===
 dist/
 build/
 out/
 *.tgz
 *.tar.gz
 
-# Runtime data
-pids
-*.pid
-*.seed
-*.pid.lock
-
-# Coverage directory used by tools like istanbul
-coverage/
-*.lcov
-
-# nyc test coverage
-.nyc_output
-
-# Dependency directories
-jspm_packages/
-
-# Optional npm cache directory
+# === NODE.JS ===
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
 .npm
-
-# Optional eslint cache
 .eslintcache
 
-# Microbundle cache
-.rpt2_cache/
-.rts2_cache_cjs/
-.rts2_cache_es/
-.rts2_cache_umd/
+# === BINARIES ===
+*.exe
+bin/opencode.exe
 
-# Optional REPL history
-.node_repl_history
+# === ELECTRON ===
+bin/goose-ultra-final/dist/
+bin/goose-ultra-final/projects/
+bin/goose-ultra-final/.vite/
 
-# Output of 'npm pack'
-*.tgz
-
-# Yarn Integrity file
-.yarn-integrity
-
-# parcel-bundler cache (https://parceljs.org/)
-.cache
-.parcel-cache
-
-# Next.js build output
-.next
-
-# Nuxt.js build / generate output
-.nuxt
-
-# Gatsby files
+# === CACHE ===
 .cache/
-public
+.parcel-cache/
+.next/
+.nuxt/
+.rpt2_cache/
 
-# Storybook build outputs
-.out
-.storybook-out
+# === COVERAGE ===
+coverage/
+*.lcov
+.nyc_output/
 
-# Temporary folders
-tmp/
-temp/
-
-# Logs
-logs
-*.log
-
-# OS generated files
+# === OS FILES ===
 .DS_Store
 .DS_Store?
 ._*
@@ -128,17 +83,15 @@ logs
 ehthumbs.db
 Thumbs.db
 
-# IDE files
+# === IDE ===
 .vscode/
 .idea/
 *.swp
 *.swo
 *~
 
-# PowerShell
+# === MISCELLANEOUS ===
+.vercel/
+.opencode/
 *.ps1xml
-
-# Windows
 *.lnk
-.vercel
-.opencode/recent_projects.json

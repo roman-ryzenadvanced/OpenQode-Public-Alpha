@@ -19,6 +19,53 @@ const CDP_PORT = 9222;
 let browser = null;
 let page = null;
 
+async function dismissCommonPopups() {
+    if (!page) return;
+    try {
+        // First, try escaping common modals.
+        await page.keyboard.press('Escape').catch(() => { });
+        await page.keyboard.press('Escape').catch(() => { });
+
+        // Then, try clicking common consent/first-run buttons if present.
+        const labels = [
+            'Accept',
+            'I agree',
+            'Agree',
+            'OK',
+            'Ok',
+            'Continue',
+            'Next',
+            'Get started',
+            'Start',
+            'No thanks',
+            'Not now',
+            'Skip',
+            'Dismiss',
+            'Close',
+            'Got it'
+        ];
+
+        for (const name of labels) {
+            const btn = page.getByRole('button', { name, exact: false }).first();
+            const count = await btn.count().catch(() => 0);
+            if (count > 0) {
+                await btn.click({ timeout: 1200 }).catch(() => { });
+            }
+        }
+
+        // Also attempt to close dialogs that present as links.
+        for (const name of ['No thanks', 'Skip', 'Continue', 'Close']) {
+            const link = page.getByRole('link', { name, exact: false }).first();
+            const count = await link.count().catch(() => 0);
+            if (count > 0) {
+                await link.click({ timeout: 1200 }).catch(() => { });
+            }
+        }
+    } catch (e) {
+        // best-effort; ignore
+    }
+}
+
 /**
  * Check if a port is in use
  */
@@ -158,7 +205,9 @@ async function executeCommand(command, args) {
         case 'navigate': {
             const url = args[0];
             if (!url) throw new Error('URL required');
+            await dismissCommonPopups();
             await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 30000 });
+            await dismissCommonPopups();
             const title = await page.title();
             return { navigated: url, title };
         }
@@ -168,6 +217,7 @@ async function executeCommand(command, args) {
             const text = args.slice(1).join(' ');
             if (!selector || !text) throw new Error('Selector and text required');
 
+            await dismissCommonPopups();
             try {
                 await page.fill(selector, text, { timeout: 5000 });
             } catch (e) {
@@ -184,6 +234,7 @@ async function executeCommand(command, args) {
             const selector = args.join(' ');
             if (!selector) throw new Error('Selector required');
 
+            await dismissCommonPopups();
             try {
                 await page.click(selector, { timeout: 5000 });
             } catch (e) {
@@ -203,7 +254,9 @@ async function executeCommand(command, args) {
         case 'press': {
             const key = args[0];
             if (!key) throw new Error('Key required');
+            await dismissCommonPopups();
             await page.keyboard.press(key);
+            await dismissCommonPopups();
             return { pressed: key };
         }
 

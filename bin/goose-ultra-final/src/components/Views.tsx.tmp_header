@@ -1,0 +1,17 @@
+import React, { useMemo, useState, useEffect, useRef } from 'react';
+import { useOrchestrator, getEnabledTabs } from '../orchestrator';
+import { Icons } from '../constants';
+import { OrchestratorState, GlobalMode, TabId } from '../types';
+import { MockComputerDriver, MockBrowserDriver, applyPlanToExistingHtml, generateMockPlan, generateMockFiles, ensureProjectOnDisk, writeLastActiveProjectId, extractMemoriesFromText, addMemory, saveProjectContext, extractProjectContext } from '../services/automationService';
+import { initializeProjectContext, undoLastChange } from '../services/ContextEngine';
+import { parseNaturalLanguageToActions, actionToPowerShell, ViControlAction } from '../services/viControlEngine';
+import { ViAgentController, requiresAgentLoop, runSimpleChain } from '../services/viAgentController';
+import { generateTaskPlan, validatePlan, formatPlanForDisplay, parseUserIntent } from '../services/viAgentPlanner';
+import { ViAgentExecutor } from '../services/viAgentExecutor';
+import { ServerNodesView } from './ServerNodesView';
+import { ViControlView } from './ViControlView';
+import { ContextFeedPanel } from './LayoutComponents';
+import Editor, { useMonaco } from '@monaco-editor/react';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
+import { motion, AnimatePresence } from 'framer-motion';

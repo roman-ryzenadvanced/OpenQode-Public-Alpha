@@ -1,229 +1,190 @@
-# 🚀 OpenQode Public (GEN5 TUI Included!)
+# 🚀 OpenQode v1.01 - Goose Ultra Edition
 
-**The Next-Generation AI Coding Assistant for your Terminal.**
-*Powered by Qwen & OpenCode.* !
-[Initial fork of OpenCode with Qwen Code model access developed with [TRAE.AI IDE](https://www.trae.ai/s/WJtxyE) and [GLM 4.6 coding model](https://z.ai/subscribe?ic=R0K78RJKNW)
+**The Next-Generation AI-Powered IDE for Modern Developers.**  
+*Powered by Qwen AI • Built with Electron • Full-Stack Development Made Easy*
 
-![OpenQode Next-Gen Interface](assets/screenshots/next-gen-1.png)
-
----
-
-## 👋 Welcome to OpenQode
-OpenQode is a powerful Terminal User Interface (TUI) that brings advanced AI coding capabilities directly to your command line. Whether you're debugging via SSH, coding on a cloud server, or just love the terminal, OpenQode is designed for you.
+![Goose Ultra Interface](assets/screenshots/next-gen-1.png)
 
 ---
 
-## ⚡ 1-Click Installation (Zero-Config)
+## 🎯 What is OpenQode?
 
-### 🖥️ Windows (PowerShell)
-Copy and paste this into PowerShell:
-```powershell
-Set-ExecutionPolicy Bypass -Scope Process -Force; [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072; iex ((New-Object System.Net.WebClient).DownloadString('https://raw.githubusercontent.com/roman-ryzenadvanced/OpenQode-Public-Alpha/main/install.ps1'))
-```
+OpenQode is a comprehensive AI coding assistant that brings the power of large language models directly to your development workflow. The flagship **Goose Ultra** application provides a beautiful, feature-rich IDE experience with:
 
-### 🍎 macOS / 🐧 Linux (Bash)
-Copy and paste this into your terminal:
-```bash
-curl -sL https://raw.githubusercontent.com/roman-ryzenadvanced/OpenQode-Public-Alpha/main/install.sh | bash
-```
-
-*(These scripts automatically download source, install dependencies, and launch the assistant)*
+- 🤖 **AI-Powered Code Generation** - Generate entire applications from natural language descriptions
+- 🎨 **Modern UI/UX** - Glass morphism design with smooth animations
+- 📁 **Project Management** - Create, manage, and iterate on multiple projects
+- 🔧 **Vi Control Panel** - Computer automation, browser control, and more
+- 💬 **Intelligent Chat** - Context-aware conversations with file attachments
+- 🧠 **Memory System** - The AI remembers your preferences and project context
 
 ---
 
-## 📦 Manual Installation
+## ⚡ Quick Start
 
 ### Windows
-1. **Download** the latest release.
-2. Double-click **`OpenQode.bat`**.
-   *(First run will automatically install dependencies)*
+```batch
+# Run the installer (first time only)
+Install.bat
 
-### Linux / Mac
-1. Open terminal in the folder.
-2. Run:
-   ```bash
-   chmod +x OpenQode.sh
-   ./OpenQode.sh
-   ```
-
----
-
-## 📋 Launcher Menu Options
-
-When you launch OpenQode, you'll see a menu with several options. Here's what each one does:
-
-### 🏠 In-House Developed TUIs (Recommended)
-
-These are custom-built TUIs developed specifically for OpenQode:
-
-| Option | Name | Description |
-|--------|------|-------------|
-| **5** | **★ Next-Gen TUI (Gen 5)** | 🌟 **Recommended!** Full dashboard with split panes, animated borders, RGB visuals, interactive menus, streaming responses, and all intelligent features (SmartX, AutoRun, etc.) |
-| **4** | TUI Classic (Gen 4) | Lightweight single-stream interface. Good for low-resource terminals or simple tasks. |
-
-### 🔧 CLI Tools (Third-Party)
-
-Standard CLI tools that work alongside OpenQode:
-
-| Option | Name | Description |
-|--------|------|-------------|
-| **2** | Qwen TUI (CLI) | Uses the official `qwen` CLI. Requires `npm install -g @qwen-code/qwen-code` |
-| **3** | OpenCode TUI (Windows) | Windows-native `opencode.exe` binary. Windows only. |
-
-### 🌐 Web-Based Tools (Early Development)
-
-> ⚠️ **Community Contributions Welcome!** These tools are in early development and not actively maintained. If you're interested in contributing, feel free to fork and improve!
-
-| Option | Name | Description |
-|--------|------|-------------|
-| **1** | Web GUI | Browser-based interface at `http://localhost:15044` |
-| **7** | Web Assist Dashboard | Assistance dashboard (Windows: Option 7, Linux: N/A) |
-| **8** | Web IDE | Alpha web-based IDE (Windows: Option 8, Linux: N/A) |
-
-### 🛠️ Utilities
-
-| Option | Name | Description |
-|--------|------|-------------|
-| **6** | Agent Manager | Manage AI agents (Windows only, or edit files manually) |
-| **9** / **7** | 🔧 Smart Repair | AI-powered TUI self-healing. Diagnose and fix crashes automatically. |
-| **0** / **8** | Exit | Close the launcher |
-
----
-
-## 🆚 Which Version Should I Use?
-We recommend starting with **Next-Gen (Option 5)**!
-
-| Feature | 🌟 **Next-Gen TUI (Gen 5)** | 🕰️ **Classic TUI (Gen 4)** |
-| :--- | :--- | :--- |
-| **Best For** | **Modern Experience** | **Low-Resource / Simple** |
-| **Interface** | **Full Dashboard** with Split Panes | Single Scrolling Stream |
-| **Visuals** | **Animated Borders**, RGB Pulse, Spinners | Static Text |
-| **Interactivity**| **Interactive Menus** (Arrow Keys Selection) | Command-based only |
-| **Computer Use** | **Command Execution** (Runs shell cmds) | Read-only |
-| **SmartX Engine** | **Autonomous Operation** (Auto-heal, auto-execute) | N/A |
-| **Auto-Approve** | **AutoRun Commands** without Y/N prompts | N/A |
-| **Projects** | **Any Absolute Path** (e.g. E:\MyProject) | Subfolders Only |
-| **Models** | **Visual Model Selector** (`/model`) | Manual Switch via CLI |
-| **Thinking** | **Real-time Stats** (CPS, Tokens) | Basic Loading |
-
-![Context and Stats](assets/screenshots/next-gen-2.png)
-
----
-
-## 🧠 Intelligent Features
-
-OpenQode Gen 5 introduces a powerful suite of intelligent automation features designed for maximum productivity:
-
-### 🧠 Core Intelligence v2
-- **Dynamic System Prompting**: Context-aware prompts that adapt to your project, OS, and active agents.
-- **Robust API Resilience**: Enhanced retry mechanisms for Vision API and network instability.
-- **Smart TUI Formatters**: Cleaner, bordered output for file operations and success messages.
-
-
-![Features Panel](assets/features-smartx.png)
-
-### 🔀 Multi-Agent Mode (`/agents`)
-Enables dynamic multi-agent orchestration. The AI intelligently selects and coordinates specialized agents based on your project's requirements—from code generation to debugging, testing, and documentation—all working in concert.
-
-### 🧩 Smart Context (`/context`)
-Persistent context sharing across agents and sessions. Your conversation history, project state, and decisions are preserved—even after restarting the TUI. Multiple agents can seamlessly share context for coherent, continuous collaboration.
-
-### 💭 Exposed Thinking (`/thinking`)
-Transparency mode that reveals the AI's reasoning process in real-time. Watch as the agent analyzes problems, considers alternatives, and formulates solutions—giving you insight into every decision.
-
-### 🚀 SmartX Engine (`/smartx`)
-Autonomous error-recovery mode. When enabled, the AI will **automatically retry and heal** from errors rather than stopping to ask for input. Failed commands, broken builds, and runtime errors are diagnosed and fixed in a continuous loop until resolved.
-
-### ⚡ AutoRun (`/auto`)
-System-level autonomous execution. An extension of SmartX that grants the AI permission to perform file operations, run shell commands, and manage server tasks **without requiring manual approval**. Perfect for hands-free automation workflows.
-
-> 💡 **Pro Tip:** Combine **SmartX + AutoRun** for fully autonomous coding sessions. Press `ESC` at any time to abort!
-
----
-
-## ⚙️ New Settings Panel
-
-The redesigned settings panel gives you one-click access to all features with live toggles:
-
-![Settings Panel](assets/settings-panel.png)
-
-### 📝 Session Memory (`/remember`, `/memory`)
-**NEW!** Persistent memory across sessions. The AI remembers facts about your project:
-```
-/remember User prefers TypeScript over JavaScript
-/memory     → View all remembered facts
-/forget 1   → Remove fact #1
+# Launch OpenQode
+OpenQode.bat
 ```
 
-### 🎯 Skills Library (`/skills`, `/skill`)
-**NEW!** 24 pre-built AI skill prompts imported from [Anthropic's Official Skills](https://github.com/anthropics/skills):
+### macOS
+```bash
+# Make scripts executable and install
+chmod +x install-macos.sh OpenQode.sh
+./install-macos.sh
 
-| Category | Skills |
-|----------|--------|
-| **Design** | `algorithmic-art`, `brand-guidelines`, `canvas-design`, `theme-factory`, `frontend-design` |
-| **Documents** | `pdf`, `docx`, `pptx`, `xlsx` |
-| **Development** | `mcp-builder`, `web-artifacts-builder`, `test`, `refactor`, `review`, `api`, `schema`, `explain` |
-| **Testing** | `webapp-testing` |
-| **Writing** | `doc-coauthoring`, `internal-comms` |
-| **Creative** | `slack-gif-creator`, `skill-creator` |
-| **Security** | `security` |
-| **Docs** | `docs` |
-
-Usage: `/skill pdf` then describe what you need!
-
-### 🔧 Debug Logging (`/debug`)
-**NEW!** Toggle detailed API request/response logging for debugging:
+# Launch OpenQode
+./OpenQode.sh
 ```
-/debug      → Toggle logging on/off
-/debugclear → Clear debug log
+
+### Linux (Ubuntu/Debian/Fedora/Arch)
+```bash
+# Make scripts executable and install
+chmod +x install-linux.sh OpenQode.sh
+./install-linux.sh
+
+# Launch OpenQode
+./OpenQode.sh
 ```
 
 ---
 
-## 🔧 Smart Repair Agent v2.0
+## 📋 Launch Menu Options
 
-When your TUI crashes or encounters errors, **Smart Repair** is an AI-powered self-healing system that diagnoses and fixes issues automatically.
-
-![Smart Repair Agent](assets/smart-repair.png)
-
-### What It Does:
-- **Analyze Errors** - Paste any crash/error message
-- **AI Diagnosis** - Identifies root cause using Qwen AI models
-- **Auto-Fix** - Runs repair commands (`npm install`, `git pull`, etc.)
-- **Verify** - Checks if the fix was successful
-
-### How to Access:
-
-| Platform | Menu Option |
-|----------|-------------|
-| **Windows** | `OpenQode.bat` → Option **9** |
-| **Linux/Mac** | `./OpenQode.sh` → Option **7** |
-| **Direct** | `node bin/smart-repair.mjs` |
-
-### Commands Inside Smart Repair:
-- **Paste error** → AI analyzes and suggests fix
-- **`model`** → Switch AI model (Coder Plus, Plus, Turbo)
-- **`auth`** → Trigger Qwen authentication
-- **`quit`** → Exit
+| Option | Name | Description |
+|--------|------|-------------|
+| **1** | 🚀 **GOOSE ULTRA** | The flagship IDE experience (Recommended!) |
+| **2** | Goose Ultra DEV | Development mode with hot-reload |
+| **3** | Next-Gen TUI (Gen 5) | Terminal-based interface with Ink |
+| **4** | TUI Classic (Gen 4) | Lightweight terminal interface |
+| **5** | Qwen Authentication | Login/refresh Qwen credentials |
+| **8** | Smart Repair | Fix common issues automatically |
 
 ---
 
-## ⚡ Feature: Zero-Config Authentication
-OpenQode attempts to use your existing Qwen CLI authentication. 
-- Using standard **Option 5**, simply follow the prompts.
-- If it's your first time, you may need to authenticate via browser.
-- The assistant is designed to be "Hassle Free"!
+## ✨ Features
 
-### 🔑 Advanced Configuration
-If you have your own API keys or specialized setup:
-1. Copy `config.example.cjs` to `config.cjs`.
-2. Edit `config.cjs` to add your keys.
+### 🖥️ Goose Ultra IDE
+
+The main attraction - a full-featured desktop IDE built with Electron:
+
+- **Visual Blueprint System** - Describe what you want, get a plan, approve, and build
+- **Live Preview** - See your application rendered in real-time
+- **Code Editor** - Monaco editor with syntax highlighting
+- **Multi-Persona Chat** - Switch between different AI personalities
+- **File Attachments** - Drag and drop files for context
+- **Project History** - All your projects saved and accessible
+
+### 🔧 Vi Control Panel (Enhanced)
+
+Advanced automation capabilities with new robust connectivity:
+
+- **Computer Use** - AI-controlled desktop automation
+- **Browser Control** - Automated web interactions
+- **Vision Analysis** - Screenshot and analyze UI elements with Qwen VL
+- **Remote Hosts** - Enhanced SSH connection management with automatic password fallback
+- **Credential Vault** - Secure password/key storage
+- **Local Engine** - Quick Diagnostics and PowerShell integration
+
+### 🎨 Design System
+
+- **Apex Mode** - Elite-level code quality enforcement
+- **Competitive Intelligence** - AI researches top competitors for design inspiration
+- **Mobile-First** - All generated code is responsive by default
+
+---
+
+## 🛠️ System Requirements
+
+### Minimum
+- **Node.js** 18.0 or higher
+- **npm** 8.0 or higher
+- **4GB RAM** for TUI mode
+- **8GB RAM** for Goose Ultra IDE
+
+### Recommended
+- **Node.js** 20.x LTS
+- **16GB RAM** for best performance
+- **SSD storage** for fast project loading
+
+---
+
+## 📁 Project Structure
+
+```
+OpenQode/
+├── bin/
+│   ├── goose-ultra-final/    # Main Electron IDE
+│   ├── opencode-ink.mjs      # Gen 5 TUI
+│   ├── opencode-tui.cjs      # Gen 4 TUI
+│   └── smart-repair.mjs      # Auto-repair tool
+├── Documentation/            # All docs and planning files
+├── assets/                   # Screenshots and images
+├── Install.bat              # Windows installer
+├── install-macos.sh         # macOS installer
+├── install-linux.sh         # Linux installer
+├── OpenQode.bat             # Windows launcher
+├── OpenQode.sh              # macOS/Linux launcher
+└── README.md                # This file
+```
+
+---
+
+## 🔐 Authentication
+
+OpenQode uses **Qwen AI** for its language model capabilities. Authentication is handled automatically:
+
+1. **First Launch** - The app will prompt you to authenticate
+2. **Browser Login** - A browser window opens for Qwen login
+3. **Token Storage** - Credentials are stored locally and encrypted
+4. **Auto-Refresh** - Tokens are refreshed automatically
+
+If you need to re-authenticate, use **Option 5** in the launcher menu.
+
+---
+
+## 🐛 Troubleshooting
+
+### "Node.js not found"
+Run the installer script for your platform:
+- Windows: `Install.bat`
+- macOS: `./install-macos.sh`
+- Linux: `./install-linux.sh`
+
+### "Build failed"
+```bash
+# In the goose-ultra-final directory:
+cd bin/goose-ultra-final
+npm install --legacy-peer-deps
+npm run build
+```
+
+### "Qwen authentication failed"
+Use **Option 5** (Qwen Authentication) in the launcher to re-authenticate.
+
+### TUI crashes or hangs
+Use **Option 8** (Smart Repair) to automatically diagnose and fix issues.
 
 ---
 
 ## 🔗 Links & Community
+
 - **GitHub:** [roman-ryzenadvanced/OpenQode-Public-Alpha](https://github.com/roman-ryzenadvanced/OpenQode-Public-Alpha)
 - **Telegram:** [@openqode](https://t.me/VibeCodePrompterSystem)
 - **Discord:** [Join Community](https://discord.gg/2nnMGB9Jdt)
 
-*Made with ❤️ by @RomanRyzenAdvanced*
+---
+
+## 📄 License
+
+This project is provided as-is for educational and development purposes.  
+See [LICENSE](LICENSE) for details.
+
+---
+
+*Made with ❤️ by @RomanRyzenAdvanced*  
+*Powered by Qwen AI • Developed with [TRAE.AI IDE](https://www.trae.ai/)*

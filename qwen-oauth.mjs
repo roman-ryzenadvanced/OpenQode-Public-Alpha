@@ -1,584 +1,349 @@
 /**
- * Qwen OAuth Implementation - Device Code Flow with PKCE
- * Based on qwen-code's qwenOAuth2.ts
- * https://github.com/QwenLM/qwen-code
- * 
- * CONVERTED TO ESM for ink v5+ compatibility
+ * Qwen OAuth / CLI Adapter for OpenQode
+ *
+ * Primary goal: make Gen5 TUI + Goose use the SAME auth as the Qwen CLI (option [4]).
+ *
+ * Strategy:
+ * - Text chat: always call `qwen` CLI with `--output-format stream-json` and parse deltas.
+ * - Vision: best-effort direct API call using Qwen CLI's `~/.qwen/oauth_creds.json`.
+ *
+ * Notes:
+ * - We intentionally do NOT depend on the legacy `bin/auth.js` flow for normal chat.
+ * - If auth is missing, instruct the user to run Qwen CLI and `/auth`.
  */
 
 import crypto from 'crypto';
 import fs from 'fs';
-import { readFile, writeFile, unlink } from 'fs/promises';
+import os from 'os';
 import path from 'path';
-import { fileURLToPath } from 'url';
 import { createRequire } from 'module';
 import { fetchWithRetry } from './lib/retry-handler.mjs';
 
-// ESM __dirname equivalent
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-
-// Qwen OAuth Constants (from qwen-code)
-const QWEN_OAUTH_BASE_URL = 'https://chat.qwen.ai';
-const QWEN_OAUTH_DEVICE_CODE_ENDPOINT = `${QWEN_OAUTH_BASE_URL}/api/v1/oauth2/device/code`;
-const QWEN_OAUTH_TOKEN_ENDPOINT = `${QWEN_OAUTH_BASE_URL}/api/v1/oauth2/token`;
-
-// Load config using createRequire (most reliable for cross-platform ESM/CJS compat)
+const require = createRequire(import.meta.url);
 let config = {};
 try {
-    const require = createRequire(import.meta.url);
-    config = require('./config.cjs');
-    // Handle both ESM and CJS exports
-    if (config.default) config = config.default;
-} catch (e) {
-    // Config missing is expected for first-time users using CLI only.
-    // We don't crash here - we just run without OAuth support (CLI fallback)
+	config = require('./config.cjs');
+	if (config.default) config = config.default;
+} catch {
+	config = {};
 }
+
 const QWEN_OAUTH_CLIENT_ID = config.QWEN_OAUTH_CLIENT_ID || null;
-const QWEN_OAUTH_SCOPE = 'openid profile email model.completion';
-const QWEN_OAUTH_GRANT_TYPE = 'urn:ietf:params:oauth:grant-type:device_code';
-const QWEN_CHAT_API = 'https://chat.qwen.ai/api/chat/completions';
+const QWEN_OAUTH_BASE_URL = 'https://chat.qwen.ai';
+const QWEN_OAUTH_TOKEN_ENDPOINT = `${QWEN_OAUTH_BASE_URL}/api/v1/oauth2/token`;
 
-// Token storage path
-const TOKEN_FILE = path.join(__dirname, '.qwen-tokens.json');
+const QWEN_CHAT_API = 'https://chat.qwen.ai/api/v1/chat/completions';
 
-/**
- * Generate PKCE code verifier (RFC 7636)
- */
-function generateCodeVerifier() {
-    return crypto.randomBytes(32).toString('base64url');
-}
+const stripAnsi = (input) => String(input || '').replace(
+	/[\u001b\u009b][[\]()#;?]*(?:[0-9]{1,4}(?:;[0-9]{0,4})*)?[0-9A-ORZcf-nqry=><]/g,
+	''
+);
 
-/**
- * Generate PKCE code challenge from verifier
- */
-function generateCodeChallenge(codeVerifier) {
-    const hash = crypto.createHash('sha256');
-    hash.update(codeVerifier);
-    return hash.digest('base64url');
-}
+const randomUUID = () => crypto.randomUUID();
 
-/**
- * Convert object to URL-encoded form data
- */
-function objectToUrlEncoded(data) {
-    return Object.keys(data)
-        .map(key => `${encodeURIComponent(key)}=${encodeURIComponent(data[key])}`)
-        .join('&');
-}
+const getOauthCredPath = () => path.join(os.homedir(), '.qwen', 'oauth_creds.json');
+
+const normalizeModel = (model) => {
+	const m = String(model || '').trim();
+	// OpenQode/Goose use friendly IDs; Qwen portal currently accepts "coder-model".
+	// Keep this mapping centralized so all launch modes behave the same.
+	const map = {
+		'qwen-coder-plus': 'coder-model',
+		'qwen-plus': 'coder-model',
+		'qwen-turbo': 'coder-model',
+		'coder-model': 'coder-model',
+	};
+	return map[m] || 'coder-model';
+};
 
 /**
- * Generate random UUID
+ * Get the Qwen CLI command (local or global installation)
  */
-function randomUUID() {
-    return crypto.randomUUID();
-}
+const getQwenCommand = () => {
+	const isWin = process.platform === 'win32';
+	// Check for local installation first
+	const localPath = path.join(path.dirname(import.meta.url.replace('file:///', '')), 'node_modules', '.bin', isWin ? 'qwen.cmd' : 'qwen');
+	if (fs.existsSync(localPath)) {
+		return localPath;
+	}
+	// Fall back to global
+	return isWin ? 'qwen.cmd' : 'qwen';
+};
 
 class QwenOAuth {
-    constructor() {
-        this.tokens = null;
-        this.deviceCodeData = null;
-        this.codeVerifier = null;
-    }
-
-    /** Load stored tokens */
-    async loadTokens() {
-        try {
-            const data = await readFile(TOKEN_FILE, 'utf8');
-            this.tokens = JSON.parse(data);
-            return this.tokens;
-        } catch (error) {
-            this.tokens = null;
-            return null;
-        }
-    }
-
-    /** Save tokens */
-    async saveTokens(tokens) {
-        this.tokens = tokens;
-        // Add expiry timestamp
-        if (tokens.expires_in && !tokens.expiry_date) {
-            tokens.expiry_date = Date.now() + (tokens.expires_in * 1000);
-        }
-        await writeFile(TOKEN_FILE, JSON.stringify(tokens, null, 2));
-    }
-
-    /** Clear tokens */
-    async clearTokens() {
-        this.tokens = null;
-        this.deviceCodeData = null;
-        this.codeVerifier = null;
-        try {
-            await unlink(TOKEN_FILE);
-        } catch (error) { }
-    }
-
-    isTokenValid() {
-        if (!this.tokens || !this.tokens.access_token) {
-            return false;
-        }
-        if (this.tokens.expiry_date) {
-            // Check with 5 minute buffer
-            return Date.now() < (this.tokens.expiry_date - 300000);
-        }
-        return true;
-    }
-
-    async refreshToken() {
-        if (!this.tokens || !this.tokens.refresh_token) {
-            throw new Error('No refresh token available');
-        }
-
-        console.log('Refreshing access token...');
-
-        const bodyData = {
-            grant_type: 'refresh_token',
-            client_id: QWEN_OAUTH_CLIENT_ID,
-            refresh_token: this.tokens.refresh_token
-        };
-
-        const response = await fetch(QWEN_OAUTH_TOKEN_ENDPOINT, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/x-www-form-urlencoded',
-                'Accept': 'application/json',
-                'x-request-id': randomUUID()
-            },
-            body: objectToUrlEncoded(bodyData)
-        });
-
-        if (!response.ok) {
-            const error = await response.text();
-            console.error('Token refresh failed:', response.status, error);
-            await this.clearTokens();
-            throw new Error(`Token refresh failed: ${response.status}`);
-        }
-
-        const newTokens = await response.json();
-        await this.saveTokens(newTokens);
-        console.log('Token refreshed successfully!');
-        return newTokens;
-    }
-
-    /**
-     * Start the Device Code Flow with PKCE
-     */
-    async startDeviceFlow() {
-        console.log('Starting Qwen Device Code Flow with PKCE...');
-
-        if (!QWEN_OAUTH_CLIENT_ID) {
-            throw new Error('Missing Client ID. Please copy config.example.cjs to config.cjs and add your QWEN_OAUTH_CLIENT_ID to use this feature.');
-        }
-
-        // Generate PKCE pair
-        this.codeVerifier = generateCodeVerifier();
-        const codeChallenge = generateCodeChallenge(this.codeVerifier);
-
-        const bodyData = {
-            client_id: QWEN_OAUTH_CLIENT_ID,
-            scope: QWEN_OAUTH_SCOPE,
-            code_challenge: codeChallenge,
-            code_challenge_method: 'S256'
-        };
-
-        console.log('Device code request body:', bodyData);
-
-        const response = await fetch(QWEN_OAUTH_DEVICE_CODE_ENDPOINT, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/x-www-form-urlencoded',
-                'Accept': 'application/json',
-                'x-request-id': randomUUID()
-            },
-            body: objectToUrlEncoded(bodyData)
-        });
-
-        if (!response.ok) {
-            const error = await response.text();
-            console.error('Device code request failed:', response.status, error);
-            throw new Error(`Device code request failed: ${response.status} - ${error}`);
-        }
-
-        this.deviceCodeData = await response.json();
-        console.log('Device code response:', this.deviceCodeData);
-
-        // Check for error in response
-        if (this.deviceCodeData.error) {
-            throw new Error(`${this.deviceCodeData.error}: ${this.deviceCodeData.error_description || 'Unknown error'}`);
-        }
-
-        return {
-            verificationUri: this.deviceCodeData.verification_uri,
-            verificationUriComplete: this.deviceCodeData.verification_uri_complete,
-            userCode: this.deviceCodeData.user_code,
-            expiresIn: this.deviceCodeData.expires_in,
-            interval: this.deviceCodeData.interval || 5,
-        };
-    }
-
-    /**
-     * Poll for tokens after user completes login
-     */
-    async pollForTokens() {
-        if (!this.deviceCodeData || !this.codeVerifier) {
-            throw new Error('Device flow not started');
-        }
-
-        const interval = (this.deviceCodeData.interval || 5) * 1000;
-        const endTime = Date.now() + (this.deviceCodeData.expires_in || 300) * 1000;
-
-        console.log(`Polling for tokens every ${interval / 1000}s...`);
-
-        while (Date.now() < endTime) {
-            try {
-                const bodyData = {
-                    grant_type: QWEN_OAUTH_GRANT_TYPE,
-                    device_code: this.deviceCodeData.device_code,
-                    client_id: QWEN_OAUTH_CLIENT_ID,
-                    code_verifier: this.codeVerifier
-                };
-
-                const response = await fetch(QWEN_OAUTH_TOKEN_ENDPOINT, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/x-www-form-urlencoded',
-                        'Accept': 'application/json',
-                        'x-request-id': randomUUID()
-                    },
-                    body: objectToUrlEncoded(bodyData)
-                });
-
-                const data = await response.json();
-
-                if (response.ok && data.access_token) {
-                    console.log('Token received successfully!');
-                    await this.saveTokens(data);
-                    this.deviceCodeData = null;
-                    this.codeVerifier = null;
-                    return data;
-                } else if (data.error === 'authorization_pending' || data.status === 'pending') {
-                    // User hasn't completed auth yet
-                    await new Promise(resolve => setTimeout(resolve, interval));
-                } else if (data.error === 'slow_down' || data.slowDown) {
-                    // Slow down polling
-                    await new Promise(resolve => setTimeout(resolve, interval * 2));
-                } else if (data.error === 'expired_token') {
-                    throw new Error('Device code expired. Please start authentication again.');
-                } else if (data.error === 'access_denied') {
-                    throw new Error('Access denied by user.');
-                } else if (data.error) {
-                    throw new Error(`${data.error}: ${data.error_description || 'Unknown error'}`);
-                } else {
-                    // Unknown response, keep polling
-                    await new Promise(resolve => setTimeout(resolve, interval));
-                }
-            } catch (error) {
-                if (error.message.includes('expired') || error.message.includes('denied')) {
-                    throw error;
-                }
-                console.error('Token poll error:', error.message);
-                await new Promise(resolve => setTimeout(resolve, interval));
-            }
-        }
-
-        throw new Error('Device flow timed out - please try again');
-    }
-
-    async getAccessToken() {
-        await this.loadTokens();
-        if (!this.tokens) {
-            throw new Error('Not authenticated. Please authenticate with Qwen first.');
-        }
-        if (!this.isTokenValid()) {
-            try {
-                await this.refreshToken();
-            } catch (error) {
-                throw new Error('Token expired. Please re-authenticate with Qwen.');
-            }
-        }
-        return this.tokens.access_token;
-    }
-
-    async checkAuth() {
-        const { exec } = await import('child_process');
-
-        // First check if we have OAuth tokens (needed for Vision API)
-        await this.loadTokens();
-        if (this.tokens && this.tokens.access_token) {
-            if (this.isTokenValid()) {
-                return { authenticated: true, method: 'oauth', hasVisionSupport: true };
-            } else {
-                // Try to refresh
-                try {
-                    await this.refreshToken();
-                    return { authenticated: true, method: 'oauth', hasVisionSupport: true };
-                } catch (e) {
-                    // Token refresh failed, fall through to CLI check
-                }
-            }
-        }
-
-        // Fall back to CLI check (works for text but not Vision)
-        return new Promise((resolve) => {
-            exec('qwen -p "ping" --help 2>&1', { timeout: 5000 }, (error, stdout, stderr) => {
-                // If qwen CLI exists, consider it authenticated (it manages its own auth)
-                if (!error || stdout.includes('help') || stdout.includes('Usage')) {
-                    resolve({ authenticated: true, method: 'qwen-cli', hasVisionSupport: false });
-                } else {
-                    resolve({ authenticated: false, reason: 'qwen CLI not available or not authenticated' });
-                }
-            });
-        });
-    }
-
-    /** Send message using qwen CLI or Vision API for images 
-     * @param {string} message - The message to send
-     * @param {string} model - The model to use
-     * @param {object} imageData - Optional image data
-     * @param {function} onChunk - Optional callback for streaming output (chunk) => void
-     * @param {string} systemPrompt - Optional system prompt to override/prepend
-     */
-    async sendMessage(message, model = 'qwen-coder-plus', imageData = null, onChunk = null, systemPrompt = null) {
-        // If we have image data, always use the Vision API
-        if (imageData) {
-            console.log('📷 Image data detected, using Vision API...');
-            return await this.sendVisionMessage(message, imageData, 'qwen-vl-plus');
-        }
-
-        // For text-only, use the CLI
-        const { spawn } = await import('child_process');
-        const os = await import('os');
-        const fsSync = await import('fs');
-
-        let finalMessage = message;
-
-        // If systemPrompt is provided (New Flow), use it directly + message
-        if (systemPrompt) {
-            // STRICT PROMPT ENGINEERING:
-            // Wrap system instructions in explicit brackets to force model adherence
-            // and separate clearly from user message.
-            finalMessage = `[SYSTEM INSTRUCTION START]\n${systemPrompt}\n[SYSTEM INSTRUCTION END]\n\n[USER MESSAGE START]\n${message}\n[USER MESSAGE END]`;
-        } else {
-            // Legacy Flow: Prepend hardcoded context for specific keywords
-            const systemContext = `[SYSTEM CONTEXT - ALWAYS FOLLOW]
-You are an AI System Administrator integrated into OpenQode.
-IMPORTANT RULES:
-1. You have FULL ACCESS to the local file system.
-2. You ARE PERMITTED to create folders, move files, and run shell commands.
-3. When asked to create files, use the >>> CREATE: syntax.
-4. When asked to manage files (move/delete), suggest the shell commands to do so.
-5. Execute instructions immediately.
-[END SYSTEM CONTEXT]
-
-`;
-            const lowerMsg = message.toLowerCase();
-            if (message.includes('CREATE:') ||
-                message.includes('ROLE:') ||
-                message.includes('Generate all necessary files') ||
-                lowerMsg.includes('open ') ||
-                lowerMsg.includes('run ') ||
-                lowerMsg.includes('computer use')) {
-                finalMessage = systemContext + message;
-            }
-        }
-
-        return new Promise((resolve) => {
-            try {
-                // Debug log removed for clean UI
-
-                // Run in current project directory to allow context access
-                const neutralCwd = process.cwd();
-
-                // WINDOWS FIX: Execute JS directly to avoid cmd.exe argument splitting limits/bugs
-                // We derived this path from `where qwen` -> qwen.cmd -> cli.js location
-                const isWin = process.platform === 'win32';
-                let command = 'qwen';
-                let args = ['-p', finalMessage];
-
-                if (isWin) {
-                    const appData = process.env.APPDATA || '';
-                    const cliPath = path.join(appData, 'npm', 'node_modules', '@qwen-code', 'qwen-code', 'cli.js');
-                    if (fs.existsSync(cliPath)) {
-                        command = 'node';
-                        args = [cliPath, '-p', finalMessage];
-                    } else {
-                        // Fallback if standard path fails (though known to exist on this machine)
-                        command = 'qwen.cmd';
-                    }
-                }
-
-                // Use spawn with shell: false (REQUIRED for clean argument passing)
-                const child = spawn(command, args, {
-                    cwd: neutralCwd,
-                    shell: false,
-                    env: {
-                        ...process.env,
-                        FORCE_COLOR: '0'
-                    }
-                });
-
-                let stdout = '';
-                let stderr = '';
-
-                child.stdout.on('data', (data) => {
-                    const chunk = data.toString();
-                    stdout += chunk;
-                    // Stream output in real-time if callback provided
-                    if (onChunk) {
-                        onChunk(chunk);
-                    }
-                });
-
-                child.stderr.on('data', (data) => {
-                    stderr += data.toString();
-                });
-
-                child.on('close', (code) => {
-                    // Clean up ANSI codes
-                    const cleanResponse = stdout.replace(/[\u001b\u009b][[\]()#;?]*(?:[0-9]{1,4}(?:;[0-9]{0,4})*)?[0-9A-ORZcf-nqry=><]/g, '').trim();
-
-                    // Debug log removed for clean UI
-
-                    if (cleanResponse) {
-                        resolve({
-                            success: true,
-                            response: cleanResponse,
-                            usage: null
-                        });
-                    } else {
-                        resolve({
-                            success: false,
-                            error: stderr || `CLI exited with code ${code}`,
-                            response: ''
-                        });
-                    }
-                });
-
-                child.on('error', (error) => {
-                    console.error('Qwen CLI spawn error:', error.message);
-                    resolve({
-                        success: false,
-                        error: error.message || 'CLI execution failed',
-                        response: ''
-                    });
-                });
-
-                // Timeout after 120 seconds for long prompts
-                setTimeout(() => {
-                    child.kill('SIGTERM');
-                    resolve({
-                        success: false,
-                        error: 'Request timed out (120s)',
-                        response: ''
-                    });
-                }, 120000);
-
-            } catch (error) {
-                console.error('Qwen CLI error:', error.message);
-                resolve({
-                    success: false,
-                    error: error.message || 'CLI execution failed',
-                    response: ''
-                });
-            }
-        });
-    }
-
-    /** Send message with image to Qwen Vision API */
-    async sendVisionMessage(message, imageData, model = 'qwen-vl-plus') {
-        try {
-            console.log('Sending vision message to Qwen VL API...');
-
-            // Get access token
-            const accessToken = await this.getAccessToken();
-
-            // Prepare the content array with image and text
-            const content = [];
-
-            // Add image (base64 data URL)
-            if (imageData) {
-                content.push({
-                    type: 'image_url',
-                    image_url: {
-                        url: imageData // Already a data URL like "data:image/png;base64,..."
-                    }
-                });
-            }
-
-            // Add text message
-            content.push({
-                type: 'text',
-                text: message
-            });
-
-            const requestBody = {
-                model: model,
-                messages: [
-                    {
-                        role: 'user',
-                        content: content
-                    }
-                ],
-                stream: false
-            };
-
-            const response = await fetchWithRetry(QWEN_CHAT_API, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${accessToken}`,
-                    'x-request-id': randomUUID()
-                },
-                body: JSON.stringify(requestBody)
-            });
-
-            if (!response.ok) {
-                const errorText = await response.text();
-                console.error('Vision API error:', response.status, errorText);
-                return {
-                    success: false,
-                    error: `Vision API error: ${response.status}`,
-                    response: ''
-                };
-            }
-
-            const data = await response.json();
-            const responseText = data.choices?.[0]?.message?.content || '';
-
-            console.log('Vision API response received:', responseText.substring(0, 100) + '...');
-
-            return {
-                success: true,
-                response: responseText,
-                usage: data.usage
-            };
-        } catch (error) {
-            console.error('Vision API error:', error.message);
-
-            // Provide helpful error message for auth issues
-            if (error.message.includes('authenticate') || error.message.includes('token')) {
-                return {
-                    success: true, // Return as success with explanation
-                    response: `⚠️ **Vision API Authentication Required**
-
-The Qwen Vision API needs OAuth authentication to analyze images. The current session is authenticated for the CLI, but Vision API requires a separate OAuth token.
-
-**To enable image analysis:**
-1. Click "Authenticate Qwen" button to re-authenticate
-2. Or describe what's in your image and I'll help without viewing it
- 
-*Your image was received (${(imageData?.length / 1024).toFixed(1)} KB) but couldn't be processed without Vision API tokens.*`,
-                    usage: null
-                };
-            }
-
-            return {
-                success: false,
-                error: error.message || 'Vision API failed',
-                response: ''
-            };
-        }
-    }
+	constructor() {
+		this.tokens = null;
+	}
+
+	async loadTokens() {
+		const tokenPath = getOauthCredPath();
+		if (!fs.existsSync(tokenPath)) {
+			this.tokens = null;
+			return null;
+		}
+		try {
+			const data = JSON.parse(fs.readFileSync(tokenPath, 'utf8'));
+			if (!data?.access_token) {
+				this.tokens = null;
+				return null;
+			}
+			this.tokens = {
+				access_token: data.access_token,
+				refresh_token: data.refresh_token,
+				token_type: data.token_type || 'Bearer',
+				expiry_date: Number(data.expiry_date || 0),
+				resource_url: data.resource_url,
+				_tokenPath: tokenPath,
+			};
+			return this.tokens;
+		} catch {
+			this.tokens = null;
+			return null;
+		}
+	}
+
+	isTokenValid() {
+		const expiry = Number(this.tokens?.expiry_date || 0);
+		if (!expiry) return true;
+		return expiry > Date.now() + 30_000;
+	}
+
+	async refreshToken() {
+		await this.loadTokens();
+		if (!this.tokens?.refresh_token) return false;
+		if (!QWEN_OAUTH_CLIENT_ID) return false;
+
+		const body = new URLSearchParams();
+		body.set('grant_type', 'refresh_token');
+		body.set('refresh_token', this.tokens.refresh_token);
+		body.set('client_id', QWEN_OAUTH_CLIENT_ID);
+
+		const resp = await fetchWithRetry(QWEN_OAUTH_TOKEN_ENDPOINT, {
+			method: 'POST',
+			headers: {
+				'Content-Type': 'application/x-www-form-urlencoded',
+				'Accept': 'application/json',
+				'x-request-id': randomUUID(),
+			},
+			body: body.toString(),
+		});
+
+		if (!resp.ok) return false;
+		const data = await resp.json().catch(() => null);
+		if (!data?.access_token) return false;
+
+		const tokenPath = this.tokens?._tokenPath || getOauthCredPath();
+		const next = {
+			access_token: data.access_token,
+			token_type: data.token_type || this.tokens.token_type || 'Bearer',
+			refresh_token: data.refresh_token || this.tokens.refresh_token,
+			resource_url: data.resource_url || this.tokens.resource_url,
+			expiry_date: data.expiry_date || (Date.now() + Number(data.expires_in || 3600) * 1000),
+		};
+		try {
+			fs.mkdirSync(path.dirname(tokenPath), { recursive: true });
+			fs.writeFileSync(tokenPath, JSON.stringify(next, null, 2));
+		} catch {
+			// ignore write errors; token is still usable in-memory
+		}
+		this.tokens = { ...next, _tokenPath: tokenPath };
+		return true;
+	}
+
+	async checkAuth() {
+		await this.loadTokens();
+		if (this.tokens?.access_token && this.isTokenValid()) {
+			return { authenticated: true, method: 'qwen-cli-oauth', hasVisionSupport: true };
+		}
+
+		// Fallback: check if qwen CLI exists (but token may be missing).
+		const { spawn } = await import('child_process');
+		const cmd = getQwenCommand();
+		const isWin = process.platform === 'win32';
+		return await new Promise((resolve) => {
+			const child = spawn(cmd, ['--version'], { shell: isWin, timeout: 5000, windowsHide: true });
+			child.on('error', () => resolve({ authenticated: false, reason: 'qwen CLI not available' }));
+			child.on('close', (code) => {
+				if (code === 0) {
+					resolve({ authenticated: false, reason: 'qwen CLI not authenticated', method: 'qwen-cli' });
+				} else {
+					resolve({ authenticated: false, reason: 'qwen CLI not available' });
+				}
+			});
+			setTimeout(() => { try { child.kill(); } catch { } resolve({ authenticated: false, reason: 'CLI check timeout' }); }, 5000);
+		});
+	}
+
+	async sendMessage(message, model = 'qwen-coder-plus', imageData = null, onChunk = null, systemPrompt = null) {
+		if (imageData) {
+			return await this.sendVisionMessage(message, imageData, 'qwen-vl-plus');
+		}
+
+		await this.loadTokens();
+		if (!this.tokens?.access_token) {
+			return {
+				success: false,
+				error: 'Not authenticated. Open option [4] and run /auth.',
+				response: '',
+			};
+		}
+
+		if (!this.isTokenValid()) {
+			const ok = await this.refreshToken();
+			if (!ok) {
+				return {
+					success: false,
+					error: 'Token expired. Open option [4] and run /auth.',
+					response: '',
+				};
+			}
+		}
+
+		const messages = [];
+		if (systemPrompt) messages.push({ role: 'system', content: String(systemPrompt) });
+		messages.push({ role: 'user', content: String(message ?? '') });
+
+		const requestBody = {
+			model: normalizeModel(model),
+			messages,
+			stream: Boolean(onChunk),
+		};
+
+		const apiEndpoint = this.tokens?.resource_url
+			? `https://${this.tokens.resource_url}/v1/chat/completions`
+			: QWEN_CHAT_API;
+
+		try {
+			const response = await fetch(apiEndpoint, {
+				method: 'POST',
+				headers: {
+					'Content-Type': 'application/json',
+					'Authorization': `Bearer ${this.tokens.access_token}`,
+					'x-request-id': randomUUID(),
+				},
+				body: JSON.stringify(requestBody),
+			});
+
+			if (!response.ok) {
+				const errorText = await response.text().catch(() => '');
+				return { success: false, error: `API error: ${response.status} ${errorText}`.trim(), response: '' };
+			}
+
+			if (onChunk) {
+				const reader = response.body?.getReader?.();
+				if (!reader) {
+					const data = await response.json().catch(() => ({}));
+					const text = data.choices?.[0]?.message?.content || '';
+					return { success: true, response: String(text) };
+				}
+
+				const decoder = new TextDecoder();
+				let buffer = '';
+				let full = '';
+				let lastSig = '';
+
+				// Minimal line-based SSE parser for OpenAI-compatible streaming:
+				// data: {"choices":[{"delta":{"content":"..."}}]}
+				const emitFromDataLine = (dataLine) => {
+					const s = String(dataLine || '').trim();
+					if (!s) return;
+					if (s === '[DONE]') return;
+					let obj;
+					try { obj = JSON.parse(s); } catch { return; }
+					const id = String(obj?.id || '');
+					const index = String(obj?.choices?.[0]?.index ?? 0);
+					const delta = obj?.choices?.[0]?.delta?.content;
+					if (typeof delta === 'string' && delta.length) {
+						const sig = `${id}:${index}:${delta}`;
+						// Some Qwen portal streams repeat identical delta frames; ignore exact repeats.
+						if (sig === lastSig) return;
+						lastSig = sig;
+						full += delta;
+						onChunk(delta);
+					}
+				};
+
+				while (true) {
+					const { done, value } = await reader.read();
+					if (done) break;
+					buffer += decoder.decode(value, { stream: true });
+
+					let idx;
+					while ((idx = buffer.indexOf('\n')) !== -1) {
+						const line = buffer.slice(0, idx);
+						buffer = buffer.slice(idx + 1);
+						const trimmed = line.trim();
+						if (!trimmed.startsWith('data:')) continue;
+						emitFromDataLine(trimmed.slice(5).trim());
+					}
+				}
+
+				// Flush remaining buffer (best-effort).
+				const remaining = buffer.trim();
+				if (remaining.startsWith('data:')) emitFromDataLine(remaining.slice(5).trim());
+
+				return { success: true, response: full };
+			}
+
+			const data = await response.json().catch(() => ({}));
+			const responseText = data.choices?.[0]?.message?.content || '';
+			return { success: true, response: String(responseText), usage: data.usage };
+		} catch (e) {
+			return { success: false, error: e?.message || String(e), response: '' };
+		}
+	}
+
+	async getAccessToken() {
+		await this.loadTokens();
+		if (!this.tokens?.access_token) throw new Error('Not authenticated');
+		if (!this.isTokenValid()) {
+			const ok = await this.refreshToken();
+			if (!ok) throw new Error('Token expired. Re-auth in Qwen CLI using /auth.');
+		}
+		return this.tokens.access_token;
+	}
+
+	async sendVisionMessage(message, imageData, model = 'qwen-vl-plus') {
+		try {
+			const accessToken = await this.getAccessToken();
+
+			const content = [];
+			if (imageData) {
+				content.push({
+					type: 'image_url',
+					image_url: { url: imageData },
+				});
+			}
+			content.push({ type: 'text', text: String(message ?? '') });
+
+			const requestBody = {
+				model,
+				messages: [{ role: 'user', content }],
+				stream: false,
+			};
+
+			const response = await fetchWithRetry(QWEN_CHAT_API, {
+				method: 'POST',
+				headers: {
+					'Content-Type': 'application/json',
+					'Authorization': `Bearer ${accessToken}`,
+					'x-request-id': randomUUID(),
+				},
+				body: JSON.stringify(requestBody),
+			});
+
+			if (!response.ok) {
+				const errorText = await response.text().catch(() => '');
+				return { success: false, error: `Vision API error: ${response.status} ${errorText}`.trim(), response: '' };
+			}
+
+			const data = await response.json().catch(() => ({}));
+			const responseText = data.choices?.[0]?.message?.content || '';
+			return { success: true, response: responseText, usage: data.usage };
+		} catch (e) {
+			return { success: false, error: e?.message || String(e), response: '' };
+		}
+	}
 }
 
 export { QwenOAuth };

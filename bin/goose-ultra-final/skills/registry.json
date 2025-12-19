@@ -1,0 +1,1211 @@
+{
+  "catalog": [
+    {
+      "id": "web-search",
+      "name": "Web Search",
+      "description": "Search the internet for real-time information.",
+      "category": "Research",
+      "version": "1.0.0",
+      "permissions": [
+        "network"
+      ],
+      "inputsSchema": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "description": "The search query"
+          }
+        },
+        "required": [
+          "query"
+        ]
+      },
+      "outputsSchema": {
+        "type": "string"
+      },
+      "entrypoint": {
+        "type": "api_call",
+        "uri": "search"
+      },
+      "icon": "Globe"
+    },
+    {
+      "id": "charts",
+      "name": "Data Charts",
+      "description": "Add interactive charts and graphs for dashboards and analytics.",
+      "category": "Frontend",
+      "version": "2.0.0",
+      "permissions": [
+        "none"
+      ],
+      "inputsSchema": {},
+      "outputsSchema": {},
+      "entrypoint": {
+        "type": "api_call",
+        "uri": "chart.js"
+      },
+      "icon": "PieChart"
+    },
+    {
+      "id": "threejs",
+      "name": "3D Engine",
+      "description": "Render high-performance 3D graphics, games, and animations.",
+      "category": "Graphics",
+      "version": "1.0.0",
+      "permissions": [
+        "none"
+      ],
+      "inputsSchema": {},
+      "outputsSchema": {},
+      "entrypoint": {
+        "type": "api_call",
+        "uri": "three"
+      },
+      "icon": "Box"
+    },
+    {
+      "id": "maps",
+      "name": "Interactive Maps",
+      "description": "Embed dynamic maps for location-based applications.",
+      "category": "Frontend",
+      "version": "1.0.0",
+      "permissions": [
+        "network"
+      ],
+      "inputsSchema": {},
+      "outputsSchema": {},
+      "entrypoint": {
+        "type": "api_call",
+        "uri": "leaflet"
+      },
+      "icon": "Globe"
+    },
+    {
+      "id": "auth",
+      "name": "User Auth",
+      "description": "Secure login, registration, and user management flows.",
+      "category": "Backend",
+      "version": "1.0.0",
+      "permissions": [
+        "network"
+      ],
+      "inputsSchema": {},
+      "outputsSchema": {},
+      "entrypoint": {
+        "type": "api_call",
+        "uri": "firebase"
+      },
+      "icon": "ShieldAlert"
+    },
+    {
+      "id": "payments",
+      "name": "Payments",
+      "description": "Process secure transactions for e-commerce and stores.",
+      "category": "Backend",
+      "version": "1.0.0",
+      "permissions": [
+        "network"
+      ],
+      "inputsSchema": {},
+      "outputsSchema": {},
+      "entrypoint": {
+        "type": "api_call",
+        "uri": "stripe"
+      },
+      "icon": "CreditCard"
+    },
+    {
+      "id": "calculator",
+      "name": "Scientific Calculator",
+      "description": "Perform complex mathematical calculations.",
+      "category": "Utility",
+      "version": "1.0.0",
+      "permissions": [
+        "none"
+      ],
+      "inputsSchema": {
+        "type": "object",
+        "properties": {
+          "expression": {
+            "type": "string",
+            "description": "Math expression"
+          }
+        },
+        "required": [
+          "expression"
+        ]
+      },
+      "outputsSchema": {
+        "type": "number"
+      },
+      "entrypoint": {
+        "type": "js_script",
+        "uri": "eval"
+      },
+      "icon": "Cpu"
+    },
+    {
+      "id": "algorithmic-art",
+      "name": "Algorithmic Art",
+      "description": "Anthropic Skill: algorithmic-art (Auto-imported)",
+      "category": "Anthropic",
+      "version": "0.0.1",
+      "permissions": [
+        "network"
+      ],
+      "inputsSchema": {
+        "type": "object",
+        "properties": {
+          "input": {
+            "type": "string"
+          }
+        }
+      },
+      "outputsSchema": {
+        "type": "string"
+      },
+      "entrypoint": {
+        "type": "python_script",
+        "uri": "skills/algorithmic-art/algorithmic-art.py"
+      },
+      "sourceUrl": "https://github.com/anthropics/skills/tree/f232228244495c018b3c1857436cf491ebb79bbb/skills/algorithmic-art",
+      "commitHash": "f232228244495c018b3c1857436cf491ebb79bbb",
+      "icon": "Terminal"
+    },
+    {
+      "id": "brand-guidelines",
+      "name": "Brand Guidelines",
+      "description": "Anthropic Skill: brand-guidelines (Auto-imported)",
+      "category": "Anthropic",
+      "version": "0.0.1",
+      "permissions": [
+        "network"
+      ],
+      "inputsSchema": {
+        "type": "object",
+        "properties": {
+          "input": {
+            "type": "string"
+          }
+        }
+      },
+      "outputsSchema": {
+        "type": "string"
+      },
+      "entrypoint": {
+        "type": "python_script",
+        "uri": "skills/brand-guidelines/brand-guidelines.py"
+      },
+      "sourceUrl": "https://github.com/anthropics/skills/tree/f232228244495c018b3c1857436cf491ebb79bbb/skills/brand-guidelines",
+      "commitHash": "f232228244495c018b3c1857436cf491ebb79bbb",
+      "icon": "Terminal"
+    },
+    {
+      "id": "canvas-design",
+      "name": "Canvas Design",
+      "description": "Anthropic Skill: canvas-design (Auto-imported)",
+      "category": "Anthropic",
+      "version": "0.0.1",
+      "permissions": [
+        "network"
+      ],
+      "inputsSchema": {
+        "type": "object",
+        "properties": {
+          "input": {
+            "type": "string"
+          }
+        }
+      },
+      "outputsSchema": {
+        "type": "string"
+      },
+      "entrypoint": {
+        "type": "python_script",
+        "uri": "skills/canvas-design/canvas-design.py"
+      },
+      "sourceUrl": "https://github.com/anthropics/skills/tree/f232228244495c018b3c1857436cf491ebb79bbb/skills/canvas-design",
+      "commitHash": "f232228244495c018b3c1857436cf491ebb79bbb",
+      "icon": "Terminal"
+    },
+    {
+      "id": "doc-coauthoring",
+      "name": "Doc Coauthoring",
+      "description": "Anthropic Skill: doc-coauthoring (Auto-imported)",
+      "category": "Anthropic",
+      "version": "0.0.1",
+      "permissions": [
+        "network"
+      ],
+      "inputsSchema": {
+        "type": "object",
+        "properties": {
+          "input": {
+            "type": "string"
+          }
+        }
+      },
+      "outputsSchema": {
+        "type": "string"
+      },
+      "entrypoint": {
+        "type": "python_script",
+        "uri": "skills/doc-coauthoring/doc-coauthoring.py"
+      },
+      "sourceUrl": "https://github.com/anthropics/skills/tree/f232228244495c018b3c1857436cf491ebb79bbb/skills/doc-coauthoring",
+      "commitHash": "f232228244495c018b3c1857436cf491ebb79bbb",
+      "icon": "Terminal"
+    },
+    {
+      "id": "docx",
+      "name": "Docx",
+      "description": "Anthropic Skill: docx (Auto-imported)",
+      "category": "Anthropic",
+      "version": "0.0.1",
+      "permissions": [
+        "network"
+      ],
+      "inputsSchema": {
+        "type": "object",
+        "properties": {
+          "input": {
+            "type": "string"
+          }
+        }
+      },
+      "outputsSchema": {
+        "type": "string"
+      },
+      "entrypoint": {
+        "type": "python_script",
+        "uri": "skills/docx/docx.py"
+      },
+      "sourceUrl": "https://github.com/anthropics/skills/tree/f232228244495c018b3c1857436cf491ebb79bbb/skills/docx",
+      "commitHash": "f232228244495c018b3c1857436cf491ebb79bbb",
+      "icon": "Terminal"
+    },
+    {
+      "id": "frontend-design",
+      "name": "Frontend Design",
+      "description": "Anthropic Skill: frontend-design (Auto-imported)",
+      "category": "Anthropic",
+      "version": "0.0.1",
+      "permissions": [
+        "network"
+      ],
+      "inputsSchema": {
+        "type": "object",
+        "properties": {
+          "input": {
+            "type": "string"
+          }
+        }
+      },
+      "outputsSchema": {
+        "type": "string"
+      },
+      "entrypoint": {
+        "type": "python_script",
+        "uri": "skills/frontend-design/frontend-design.py"
+      },
+      "sourceUrl": "https://github.com/anthropics/skills/tree/f232228244495c018b3c1857436cf491ebb79bbb/skills/frontend-design",
+      "commitHash": "f232228244495c018b3c1857436cf491ebb79bbb",
+      "icon": "Terminal"
+    },
+    {
+      "id": "internal-comms",
+      "name": "Internal Comms",
+      "description": "Anthropic Skill: internal-comms (Auto-imported)",
+      "category": "Anthropic",
+      "version": "0.0.1",
+      "permissions": [
+        "network"
+      ],
+      "inputsSchema": {
+        "type": "object",
+        "properties": {
+          "input": {
+            "type": "string"
+          }
+        }
+      },
+      "outputsSchema": {
+        "type": "string"
+      },
+      "entrypoint": {
+        "type": "python_script",
+        "uri": "skills/internal-comms/internal-comms.py"
+      },
+      "sourceUrl": "https://github.com/anthropics/skills/tree/f232228244495c018b3c1857436cf491ebb79bbb/skills/internal-comms",
+      "commitHash": "f232228244495c018b3c1857436cf491ebb79bbb",
+      "icon": "Terminal"
+    },
+    {
+      "id": "mcp-builder",
+      "name": "Mcp Builder",
+      "description": "Anthropic Skill: mcp-builder (Auto-imported)",
+      "category": "Anthropic",
+      "version": "0.0.1",
+      "permissions": [
+        "network"
+      ],
+      "inputsSchema": {
+        "type": "object",
+        "properties": {
+          "input": {
+            "type": "string"
+          }
+        }
+      },
+      "outputsSchema": {
+        "type": "string"
+      },
+      "entrypoint": {
+        "type": "python_script",
+        "uri": "skills/mcp-builder/mcp-builder.py"
+      },
+      "sourceUrl": "https://github.com/anthropics/skills/tree/f232228244495c018b3c1857436cf491ebb79bbb/skills/mcp-builder",
+      "commitHash": "f232228244495c018b3c1857436cf491ebb79bbb",
+      "icon": "Terminal"
+    },
+    {
+      "id": "pdf",
+      "name": "Pdf",
+      "description": "Anthropic Skill: pdf (Auto-imported)",
+      "category": "Anthropic",
+      "version": "0.0.1",
+      "permissions": [
+        "network"
+      ],
+      "inputsSchema": {
+        "type": "object",
+        "properties": {
+          "input": {
+            "type": "string"
+          }
+        }
+      },
+      "outputsSchema": {
+        "type": "string"
+      },
+      "entrypoint": {
+        "type": "python_script",
+        "uri": "skills/pdf/pdf.py"
+      },
+      "sourceUrl": "https://github.com/anthropics/skills/tree/f232228244495c018b3c1857436cf491ebb79bbb/skills/pdf",
+      "commitHash": "f232228244495c018b3c1857436cf491ebb79bbb",
+      "icon": "Terminal"
+    },
+    {
+      "id": "pptx",
+      "name": "Pptx",
+      "description": "Anthropic Skill: pptx (Auto-imported)",
+      "category": "Anthropic",
+      "version": "0.0.1",
+      "permissions": [
+        "network"
+      ],
+      "inputsSchema": {
+        "type": "object",
+        "properties": {
+          "input": {
+            "type": "string"
+          }
+        }
+      },
+      "outputsSchema": {
+        "type": "string"
+      },
+      "entrypoint": {
+        "type": "python_script",
+        "uri": "skills/pptx/pptx.py"
+      },
+      "sourceUrl": "https://github.com/anthropics/skills/tree/f232228244495c018b3c1857436cf491ebb79bbb/skills/pptx",
+      "commitHash": "f232228244495c018b3c1857436cf491ebb79bbb",
+      "icon": "Terminal"
+    },
+    {
+      "id": "skill-creator",
+      "name": "Skill Creator",
+      "description": "Anthropic Skill: skill-creator (Auto-imported)",
+      "category": "Anthropic",
+      "version": "0.0.1",
+      "permissions": [
+        "network"
+      ],
+      "inputsSchema": {
+        "type": "object",
+        "properties": {
+          "input": {
+            "type": "string"
+          }
+        }
+      },
+      "outputsSchema": {
+        "type": "string"
+      },
+      "entrypoint": {
+        "type": "python_script",
+        "uri": "skills/skill-creator/skill-creator.py"
+      },
+      "sourceUrl": "https://github.com/anthropics/skills/tree/f232228244495c018b3c1857436cf491ebb79bbb/skills/skill-creator",
+      "commitHash": "f232228244495c018b3c1857436cf491ebb79bbb",
+      "icon": "Terminal"
+    },
+    {
+      "id": "slack-gif-creator",
+      "name": "Slack Gif Creator",
+      "description": "Anthropic Skill: slack-gif-creator (Auto-imported)",
+      "category": "Anthropic",
+      "version": "0.0.1",
+      "permissions": [
+        "network"
+      ],
+      "inputsSchema": {
+        "type": "object",
+        "properties": {
+          "input": {
+            "type": "string"
+          }
+        }
+      },
+      "outputsSchema": {
+        "type": "string"
+      },
+      "entrypoint": {
+        "type": "python_script",
+        "uri": "skills/slack-gif-creator/slack-gif-creator.py"
+      },
+      "sourceUrl": "https://github.com/anthropics/skills/tree/f232228244495c018b3c1857436cf491ebb79bbb/skills/slack-gif-creator",
+      "commitHash": "f232228244495c018b3c1857436cf491ebb79bbb",
+      "icon": "Terminal"
+    },
+    {
+      "id": "theme-factory",
+      "name": "Theme Factory",
+      "description": "Anthropic Skill: theme-factory (Auto-imported)",
+      "category": "Anthropic",
+      "version": "0.0.1",
+      "permissions": [
+        "network"
+      ],
+      "inputsSchema": {
+        "type": "object",
+        "properties": {
+          "input": {
+            "type": "string"
+          }
+        }
+      },
+      "outputsSchema": {
+        "type": "string"
+      },
+      "entrypoint": {
+        "type": "python_script",
+        "uri": "skills/theme-factory/theme-factory.py"
+      },
+      "sourceUrl": "https://github.com/anthropics/skills/tree/f232228244495c018b3c1857436cf491ebb79bbb/skills/theme-factory",
+      "commitHash": "f232228244495c018b3c1857436cf491ebb79bbb",
+      "icon": "Terminal"
+    },
+    {
+      "id": "web-artifacts-builder",
+      "name": "Web Artifacts Builder",
+      "description": "Anthropic Skill: web-artifacts-builder (Auto-imported)",
+      "category": "Anthropic",
+      "version": "0.0.1",
+      "permissions": [
+        "network"
+      ],
+      "inputsSchema": {
+        "type": "object",
+        "properties": {
+          "input": {
+            "type": "string"
+          }
+        }
+      },
+      "outputsSchema": {
+        "type": "string"
+      },
+      "entrypoint": {
+        "type": "python_script",
+        "uri": "skills/web-artifacts-builder/web-artifacts-builder.py"
+      },
+      "sourceUrl": "https://github.com/anthropics/skills/tree/f232228244495c018b3c1857436cf491ebb79bbb/skills/web-artifacts-builder",
+      "commitHash": "f232228244495c018b3c1857436cf491ebb79bbb",
+      "icon": "Terminal"
+    },
+    {
+      "id": "webapp-testing",
+      "name": "Webapp Testing",
+      "description": "Anthropic Skill: webapp-testing (Auto-imported)",
+      "category": "Anthropic",
+      "version": "0.0.1",
+      "permissions": [
+        "network"
+      ],
+      "inputsSchema": {
+        "type": "object",
+        "properties": {
+          "input": {
+            "type": "string"
+          }
+        }
+      },
+      "outputsSchema": {
+        "type": "string"
+      },
+      "entrypoint": {
+        "type": "python_script",
+        "uri": "skills/webapp-testing/webapp-testing.py"
+      },
+      "sourceUrl": "https://github.com/anthropics/skills/tree/f232228244495c018b3c1857436cf491ebb79bbb/skills/webapp-testing",
+      "commitHash": "f232228244495c018b3c1857436cf491ebb79bbb",
+      "icon": "Terminal"
+    },
+    {
+      "id": "xlsx",
+      "name": "Xlsx",
+      "description": "Anthropic Skill: xlsx (Auto-imported)",
+      "category": "Anthropic",
+      "version": "0.0.1",
+      "permissions": [
+        "network"
+      ],
+      "inputsSchema": {
+        "type": "object",
+        "properties": {
+          "input": {
+            "type": "string"
+          }
+        }
+      },
+      "outputsSchema": {
+        "type": "string"
+      },
+      "entrypoint": {
+        "type": "python_script",
+        "uri": "skills/xlsx/xlsx.py"
+      },
+      "sourceUrl": "https://github.com/anthropics/skills/tree/f232228244495c018b3c1857436cf491ebb79bbb/skills/xlsx",
+      "commitHash": "f232228244495c018b3c1857436cf491ebb79bbb",
+      "icon": "Terminal"
+    },
+    {
+      "id": "custom-1766084353208",
+      "name": "Turn any AI",
+      "description": "Custom generated skill: Turn any AI model into Claude Opus 4.5 Grade",
+      "category": "Custom",
+      "version": "1.0.0",
+      "permissions": [
+        "none"
+      ],
+      "inputsSchema": {},
+      "outputsSchema": {},
+      "entrypoint": {
+        "type": "js_script",
+        "uri": "console.log(\"Generated Skill Active\")"
+      },
+      "icon": "Zap"
+    },
+    {
+      "id": "custom-1766092563504",
+      "name": "{  ",
+      "description": "Custom generated skill: {   \"prompt\": \"Architect breathtaking, futuristic interfaces using Next.js, Three.js, and Framer Motion.\" }",
+      "category": "Custom",
+      "version": "1.0.0",
+      "permissions": [
+        "none"
+      ],
+      "inputsSchema": {},
+      "outputsSchema": {},
+      "entrypoint": {
+        "type": "js_script",
+        "uri": "console.log(\"Generated Skill Active\")"
+      },
+      "icon": "Zap"
+    }
+  ],
+  "installed": [
+    {
+      "id": "webapp-testing",
+      "name": "Webapp Testing",
+      "description": "Anthropic Skill: webapp-testing (Auto-imported)",
+      "category": "Anthropic",
+      "version": "0.0.1",
+      "permissions": [
+        "network"
+      ],
+      "inputsSchema": {
+        "type": "object",
+        "properties": {
+          "input": {
+            "type": "string"
+          }
+        }
+      },
+      "outputsSchema": {
+        "type": "string"
+      },
+      "entrypoint": {
+        "type": "python_script",
+        "uri": "skills/webapp-testing/webapp-testing.py"
+      },
+      "sourceUrl": "https://github.com/anthropics/skills/tree/f232228244495c018b3c1857436cf491ebb79bbb/skills/webapp-testing",
+      "commitHash": "f232228244495c018b3c1857436cf491ebb79bbb",
+      "icon": "Terminal"
+    },
+    {
+      "id": "web-artifacts-builder",
+      "name": "Web Artifacts Builder",
+      "description": "Anthropic Skill: web-artifacts-builder (Auto-imported)",
+      "category": "Anthropic",
+      "version": "0.0.1",
+      "permissions": [
+        "network"
+      ],
+      "inputsSchema": {
+        "type": "object",
+        "properties": {
+          "input": {
+            "type": "string"
+          }
+        }
+      },
+      "outputsSchema": {
+        "type": "string"
+      },
+      "entrypoint": {
+        "type": "python_script",
+        "uri": "skills/web-artifacts-builder/web-artifacts-builder.py"
+      },
+      "sourceUrl": "https://github.com/anthropics/skills/tree/f232228244495c018b3c1857436cf491ebb79bbb/skills/web-artifacts-builder",
+      "commitHash": "f232228244495c018b3c1857436cf491ebb79bbb",
+      "icon": "Terminal"
+    },
+    {
+      "id": "xlsx",
+      "name": "Xlsx",
+      "description": "Anthropic Skill: xlsx (Auto-imported)",
+      "category": "Anthropic",
+      "version": "0.0.1",
+      "permissions": [
+        "network"
+      ],
+      "inputsSchema": {
+        "type": "object",
+        "properties": {
+          "input": {
+            "type": "string"
+          }
+        }
+      },
+      "outputsSchema": {
+        "type": "string"
+      },
+      "entrypoint": {
+        "type": "python_script",
+        "uri": "skills/xlsx/xlsx.py"
+      },
+      "sourceUrl": "https://github.com/anthropics/skills/tree/f232228244495c018b3c1857436cf491ebb79bbb/skills/xlsx",
+      "commitHash": "f232228244495c018b3c1857436cf491ebb79bbb",
+      "icon": "Terminal"
+    },
+    {
+      "id": "algorithmic-art",
+      "name": "Algorithmic Art",
+      "description": "Anthropic Skill: algorithmic-art (Auto-imported)",
+      "category": "Anthropic",
+      "version": "0.0.1",
+      "permissions": [
+        "network"
+      ],
+      "inputsSchema": {
+        "type": "object",
+        "properties": {
+          "input": {
+            "type": "string"
+          }
+        }
+      },
+      "outputsSchema": {
+        "type": "string"
+      },
+      "entrypoint": {
+        "type": "python_script",
+        "uri": "skills/algorithmic-art/algorithmic-art.py"
+      },
+      "sourceUrl": "https://github.com/anthropics/skills/tree/f232228244495c018b3c1857436cf491ebb79bbb/skills/algorithmic-art",
+      "commitHash": "f232228244495c018b3c1857436cf491ebb79bbb",
+      "icon": "Terminal"
+    },
+    {
+      "id": "calculator",
+      "name": "Scientific Calculator",
+      "description": "Perform complex mathematical calculations.",
+      "category": "Utility",
+      "version": "1.0.0",
+      "permissions": [
+        "none"
+      ],
+      "inputsSchema": {
+        "type": "object",
+        "properties": {
+          "expression": {
+            "type": "string",
+            "description": "Math expression"
+          }
+        },
+        "required": [
+          "expression"
+        ]
+      },
+      "outputsSchema": {
+        "type": "number"
+      },
+      "entrypoint": {
+        "type": "js_script",
+        "uri": "eval"
+      },
+      "icon": "Cpu"
+    },
+    {
+      "id": "frontend-design",
+      "name": "Frontend Design",
+      "description": "Anthropic Skill: frontend-design (Auto-imported)",
+      "category": "Anthropic",
+      "version": "0.0.1",
+      "permissions": [
+        "network"
+      ],
+      "inputsSchema": {
+        "type": "object",
+        "properties": {
+          "input": {
+            "type": "string"
+          }
+        }
+      },
+      "outputsSchema": {
+        "type": "string"
+      },
+      "entrypoint": {
+        "type": "python_script",
+        "uri": "skills/frontend-design/frontend-design.py"
+      },
+      "sourceUrl": "https://github.com/anthropics/skills/tree/f232228244495c018b3c1857436cf491ebb79bbb/skills/frontend-design",
+      "commitHash": "f232228244495c018b3c1857436cf491ebb79bbb",
+      "icon": "Terminal"
+    },
+    {
+      "id": "pdf",
+      "name": "Pdf",
+      "description": "Anthropic Skill: pdf (Auto-imported)",
+      "category": "Anthropic",
+      "version": "0.0.1",
+      "permissions": [
+        "network"
+      ],
+      "inputsSchema": {
+        "type": "object",
+        "properties": {
+          "input": {
+            "type": "string"
+          }
+        }
+      },
+      "outputsSchema": {
+        "type": "string"
+      },
+      "entrypoint": {
+        "type": "python_script",
+        "uri": "skills/pdf/pdf.py"
+      },
+      "sourceUrl": "https://github.com/anthropics/skills/tree/f232228244495c018b3c1857436cf491ebb79bbb/skills/pdf",
+      "commitHash": "f232228244495c018b3c1857436cf491ebb79bbb",
+      "icon": "Terminal"
+    },
+    {
+      "id": "mcp-builder",
+      "name": "Mcp Builder",
+      "description": "Anthropic Skill: mcp-builder (Auto-imported)",
+      "category": "Anthropic",
+      "version": "0.0.1",
+      "permissions": [
+        "network"
+      ],
+      "inputsSchema": {
+        "type": "object",
+        "properties": {
+          "input": {
+            "type": "string"
+          }
+        }
+      },
+      "outputsSchema": {
+        "type": "string"
+      },
+      "entrypoint": {
+        "type": "python_script",
+        "uri": "skills/mcp-builder/mcp-builder.py"
+      },
+      "sourceUrl": "https://github.com/anthropics/skills/tree/f232228244495c018b3c1857436cf491ebb79bbb/skills/mcp-builder",
+      "commitHash": "f232228244495c018b3c1857436cf491ebb79bbb",
+      "icon": "Terminal"
+    },
+    {
+      "id": "web-search",
+      "name": "Web Search",
+      "description": "Search the internet for real-time information.",
+      "category": "Research",
+      "version": "1.0.0",
+      "permissions": [
+        "network"
+      ],
+      "inputsSchema": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "description": "The search query"
+          }
+        },
+        "required": [
+          "query"
+        ]
+      },
+      "outputsSchema": {
+        "type": "string"
+      },
+      "entrypoint": {
+        "type": "api_call",
+        "uri": "search"
+      },
+      "icon": "Globe"
+    },
+    {
+      "id": "canvas-design",
+      "name": "Canvas Design",
+      "description": "Anthropic Skill: canvas-design (Auto-imported)",
+      "category": "Anthropic",
+      "version": "0.0.1",
+      "permissions": [
+        "network"
+      ],
+      "inputsSchema": {
+        "type": "object",
+        "properties": {
+          "input": {
+            "type": "string"
+          }
+        }
+      },
+      "outputsSchema": {
+        "type": "string"
+      },
+      "entrypoint": {
+        "type": "python_script",
+        "uri": "skills/canvas-design/canvas-design.py"
+      },
+      "sourceUrl": "https://github.com/anthropics/skills/tree/f232228244495c018b3c1857436cf491ebb79bbb/skills/canvas-design",
+      "commitHash": "f232228244495c018b3c1857436cf491ebb79bbb",
+      "icon": "Terminal"
+    },
+    {
+      "id": "brand-guidelines",
+      "name": "Brand Guidelines",
+      "description": "Anthropic Skill: brand-guidelines (Auto-imported)",
+      "category": "Anthropic",
+      "version": "0.0.1",
+      "permissions": [
+        "network"
+      ],
+      "inputsSchema": {
+        "type": "object",
+        "properties": {
+          "input": {
+            "type": "string"
+          }
+        }
+      },
+      "outputsSchema": {
+        "type": "string"
+      },
+      "entrypoint": {
+        "type": "python_script",
+        "uri": "skills/brand-guidelines/brand-guidelines.py"
+      },
+      "sourceUrl": "https://github.com/anthropics/skills/tree/f232228244495c018b3c1857436cf491ebb79bbb/skills/brand-guidelines",
+      "commitHash": "f232228244495c018b3c1857436cf491ebb79bbb",
+      "icon": "Terminal"
+    },
+    {
+      "id": "internal-comms",
+      "name": "Internal Comms",
+      "description": "Anthropic Skill: internal-comms (Auto-imported)",
+      "category": "Anthropic",
+      "version": "0.0.1",
+      "permissions": [
+        "network"
+      ],
+      "inputsSchema": {
+        "type": "object",
+        "properties": {
+          "input": {
+            "type": "string"
+          }
+        }
+      },
+      "outputsSchema": {
+        "type": "string"
+      },
+      "entrypoint": {
+        "type": "python_script",
+        "uri": "skills/internal-comms/internal-comms.py"
+      },
+      "sourceUrl": "https://github.com/anthropics/skills/tree/f232228244495c018b3c1857436cf491ebb79bbb/skills/internal-comms",
+      "commitHash": "f232228244495c018b3c1857436cf491ebb79bbb",
+      "icon": "Terminal"
+    },
+    {
+      "id": "doc-coauthoring",
+      "name": "Doc Coauthoring",
+      "description": "Anthropic Skill: doc-coauthoring (Auto-imported)",
+      "category": "Anthropic",
+      "version": "0.0.1",
+      "permissions": [
+        "network"
+      ],
+      "inputsSchema": {
+        "type": "object",
+        "properties": {
+          "input": {
+            "type": "string"
+          }
+        }
+      },
+      "outputsSchema": {
+        "type": "string"
+      },
+      "entrypoint": {
+        "type": "python_script",
+        "uri": "skills/doc-coauthoring/doc-coauthoring.py"
+      },
+      "sourceUrl": "https://github.com/anthropics/skills/tree/f232228244495c018b3c1857436cf491ebb79bbb/skills/doc-coauthoring",
+      "commitHash": "f232228244495c018b3c1857436cf491ebb79bbb",
+      "icon": "Terminal"
+    },
+    {
+      "id": "charts",
+      "name": "Data Charts",
+      "description": "Add interactive charts and graphs for dashboards and analytics.",
+      "category": "Frontend",
+      "version": "2.0.0",
+      "permissions": [
+        "none"
+      ],
+      "inputsSchema": {},
+      "outputsSchema": {},
+      "entrypoint": {
+        "type": "api_call",
+        "uri": "chart.js"
+      },
+      "icon": "PieChart"
+    },
+    {
+      "id": "threejs",
+      "name": "3D Engine",
+      "description": "Render high-performance 3D graphics, games, and animations.",
+      "category": "Graphics",
+      "version": "1.0.0",
+      "permissions": [
+        "none"
+      ],
+      "inputsSchema": {},
+      "outputsSchema": {},
+      "entrypoint": {
+        "type": "api_call",
+        "uri": "three"
+      },
+      "icon": "Box"
+    },
+    {
+      "id": "skill-creator",
+      "name": "Skill Creator",
+      "description": "Anthropic Skill: skill-creator (Auto-imported)",
+      "category": "Anthropic",
+      "version": "0.0.1",
+      "permissions": [
+        "network"
+      ],
+      "inputsSchema": {
+        "type": "object",
+        "properties": {
+          "input": {
+            "type": "string"
+          }
+        }
+      },
+      "outputsSchema": {
+        "type": "string"
+      },
+      "entrypoint": {
+        "type": "python_script",
+        "uri": "skills/skill-creator/skill-creator.py"
+      },
+      "sourceUrl": "https://github.com/anthropics/skills/tree/f232228244495c018b3c1857436cf491ebb79bbb/skills/skill-creator",
+      "commitHash": "f232228244495c018b3c1857436cf491ebb79bbb",
+      "icon": "Terminal"
+    },
+    {
+      "id": "docx",
+      "name": "Docx",
+      "description": "Anthropic Skill: docx (Auto-imported)",
+      "category": "Anthropic",
+      "version": "0.0.1",
+      "permissions": [
+        "network"
+      ],
+      "inputsSchema": {
+        "type": "object",
+        "properties": {
+          "input": {
+            "type": "string"
+          }
+        }
+      },
+      "outputsSchema": {
+        "type": "string"
+      },
+      "entrypoint": {
+        "type": "python_script",
+        "uri": "skills/docx/docx.py"
+      },
+      "sourceUrl": "https://github.com/anthropics/skills/tree/f232228244495c018b3c1857436cf491ebb79bbb/skills/docx",
+      "commitHash": "f232228244495c018b3c1857436cf491ebb79bbb",
+      "icon": "Terminal"
+    },
+    {
+      "id": "pptx",
+      "name": "Pptx",
+      "description": "Anthropic Skill: pptx (Auto-imported)",
+      "category": "Anthropic",
+      "version": "0.0.1",
+      "permissions": [
+        "network"
+      ],
+      "inputsSchema": {
+        "type": "object",
+        "properties": {
+          "input": {
+            "type": "string"
+          }
+        }
+      },
+      "outputsSchema": {
+        "type": "string"
+      },
+      "entrypoint": {
+        "type": "python_script",
+        "uri": "skills/pptx/pptx.py"
+      },
+      "sourceUrl": "https://github.com/anthropics/skills/tree/f232228244495c018b3c1857436cf491ebb79bbb/skills/pptx",
+      "commitHash": "f232228244495c018b3c1857436cf491ebb79bbb",
+      "icon": "Terminal"
+    },
+    {
+      "id": "custom-1766084353208",
+      "name": "Turn any AI",
+      "description": "Custom generated skill: Turn any AI model into Claude Opus 4.5 Grade",
+      "category": "Custom",
+      "version": "1.0.0",
+      "permissions": [
+        "none"
+      ],
+      "inputsSchema": {},
+      "outputsSchema": {},
+      "entrypoint": {
+        "type": "js_script",
+        "uri": "console.log(\"Generated Skill Active\")"
+      },
+      "icon": "Zap"
+    },
+    {
+      "id": "custom-1766092563504",
+      "name": "{  ",
+      "description": "Custom generated skill: {   \"prompt\": \"Architect breathtaking, futuristic interfaces using Next.js, Three.js, and Framer Motion.\" }",
+      "category": "Custom",
+      "version": "1.0.0",
+      "permissions": [
+        "none"
+      ],
+      "inputsSchema": {},
+      "outputsSchema": {},
+      "entrypoint": {
+        "type": "js_script",
+        "uri": "console.log(\"Generated Skill Active\")"
+      },
+      "icon": "Zap"
+    },
+    {
+      "id": "theme-factory",
+      "name": "Theme Factory",
+      "description": "Anthropic Skill: theme-factory (Auto-imported)",
+      "category": "Anthropic",
+      "version": "0.0.1",
+      "permissions": [
+        "network"
+      ],
+      "inputsSchema": {
+        "type": "object",
+        "properties": {
+          "input": {
+            "type": "string"
+          }
+        }
+      },
+      "outputsSchema": {
+        "type": "string"
+      },
+      "entrypoint": {
+        "type": "python_script",
+        "uri": "skills/theme-factory/theme-factory.py"
+      },
+      "sourceUrl": "https://github.com/anthropics/skills/tree/f232228244495c018b3c1857436cf491ebb79bbb/skills/theme-factory",
+      "commitHash": "f232228244495c018b3c1857436cf491ebb79bbb",
+      "icon": "Terminal"
+    },
+    {
+      "id": "slack-gif-creator",
+      "name": "Slack Gif Creator",
+      "description": "Anthropic Skill: slack-gif-creator (Auto-imported)",
+      "category": "Anthropic",
+      "version": "0.0.1",
+      "permissions": [
+        "network"
+      ],
+      "inputsSchema": {
+        "type": "object",
+        "properties": {
+          "input": {
+            "type": "string"
+          }
+        }
+      },
+      "outputsSchema": {
+        "type": "string"
+      },
+      "entrypoint": {
+        "type": "python_script",
+        "uri": "skills/slack-gif-creator/slack-gif-creator.py"
+      },
+      "sourceUrl": "https://github.com/anthropics/skills/tree/f232228244495c018b3c1857436cf491ebb79bbb/skills/slack-gif-creator",
+      "commitHash": "f232228244495c018b3c1857436cf491ebb79bbb",
+      "icon": "Terminal"
+    }
+  ],
+  "personaOverrides": {},
+  "lastUpdated": 1766092676052
+}

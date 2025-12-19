@@ -63,9 +63,57 @@ class QwenOAuth {
     }
 
     async loadTokens() {
+        const os = require('os');
+
+        // Priority 1: Official Qwen CLI tokens (~/.qwen/oauth_creds.json)
+        try {
+            const qwenCliTokenFile = path.join(os.homedir(), '.qwen', 'oauth_creds.json');
+            if (fsSync.existsSync(qwenCliTokenFile)) {
+                const data = await fs.readFile(qwenCliTokenFile, 'utf8');
+                const creds = JSON.parse(data);
+                if (creds.access_token) {
+                    // Convert official CLI format to our format
+                    this.tokens = {
+                        access_token: creds.access_token,
+                        refresh_token: creds.refresh_token,
+                        token_type: creds.token_type || 'Bearer',
+                        expiry_date: creds.expiry_date || (Date.now() + (creds.expires_in * 1000)),
+                        resource_url: creds.resource_url
+                    };
+                    console.log('✅ Using tokens from official Qwen CLI');
+                    return this.tokens;
+                }
+            }
+        } catch (error) {
+            // Fall through to next option
+        }
+
+        // Priority 2: Shared opencode tokens (from opencode.exe auth)
+        try {
+            const sharedTokenFile = path.join(os.homedir(), '.opencode', 'qwen-shared-tokens.json');
+            if (fsSync.existsSync(sharedTokenFile)) {
+                const data = await fs.readFile(sharedTokenFile, 'utf8');
+                const shared = JSON.parse(data);
+                if (shared.credentials) {
+                    // Convert opencode format to our format
+                    this.tokens = {
+                        access_token: shared.credentials.access_token,
+                        token_type: shared.credentials.token_type || 'Bearer',
+                        expiry_date: shared.credentials.expiry_date
+                    };
+                    console.log('✅ Using tokens from opencode shared storage');
+                    return this.tokens;
+                }
+            }
+        } catch (error) {
+            // Fall through to try local tokens
+        }
+
+        // Priority 3: Local tokens
         try {
             const data = await fs.readFile(TOKEN_FILE, 'utf8');
             this.tokens = JSON.parse(data);
+            console.log('✅ Using local tokens');
             return this.tokens;
         } catch (error) {
             this.tokens = null;
@@ -256,7 +304,7 @@ class QwenOAuth {
     }
 
     async checkAuth() {
-        const { exec } = require('child_process');
+        const { spawn } = require('child_process');
 
         await this.loadTokens();
         if (this.tokens && this.tokens.access_token) {
@@ -271,13 +319,36 @@ class QwenOAuth {
         }
 
         return new Promise((resolve) => {
-            exec('qwen -p "ping" --help 2>&1', { timeout: 5000 }, (error, stdout, stderr) => {
-                if (!error || stdout.includes('help') || stdout.includes('Usage')) {
+            const isWin = process.platform === 'win32';
+            let command = 'qwen';
+            let args = ['--version'];
+
+            if (isWin) {
+                const appData = process.env.APPDATA || '';
+                const cliPath = path.join(appData, 'npm', 'node_modules', '@qwen-code', 'qwen-code', 'cli.js');
+                if (fsSync.existsSync(cliPath)) {
+                    command = 'node';
+                    args = [cliPath, '--version'];
+                } else {
+                    command = 'qwen.cmd';
+                }
+            }
+
+            const child = spawn(command, args, { shell: isWin, timeout: 5000 });
+
+            child.on('error', () => {
+                resolve({ authenticated: false, reason: 'qwen CLI not available' });
+            });
+
+            child.on('close', (code) => {
+                if (code === 0) {
                     resolve({ authenticated: true, method: 'qwen-cli', hasVisionSupport: false });
                 } else {
-                    resolve({ authenticated: false, reason: 'qwen CLI not available or not authenticated' });
+                    resolve({ authenticated: false, reason: 'qwen CLI not authenticated' });
                 }
             });
+
+            setTimeout(() => { child.kill(); resolve({ authenticated: false, reason: 'CLI check timeout' }); }, 5000);
         });
     }
 
@@ -428,7 +499,12 @@ IMPORTANT RULES:
                 stream: false
             };
 
-            const response = await fetch(QWEN_CHAT_API, {
+            // info: Use dynamic endpoint if provided in tokens (e.g. portal.qwen.ai)
+            const apiEndpoint = this.tokens?.resource_url
+                ? `https://${this.tokens.resource_url}/v1/chat/completions`
+                : QWEN_CHAT_API;
+
+            let response = await fetch(apiEndpoint, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -439,14 +515,72 @@ IMPORTANT RULES:
             });
 
             if (!response.ok) {
-                const errorText = await response.text();
-                return {
-                    success: false,
-                    error: `Vision API error: ${response.status}`,
-                    response: ''
-                };
+                // If 401, try to refresh token and retry
+                if (response.status === 401) {
+                    console.log('Access token expired, attempting to refresh...');
+                    if (this.tokens && this.tokens.refresh_token) {
+                        try {
+                            const refreshSuccess = await this.refreshToken();
+                            if (refreshSuccess) {
+                                // Retry request with new token
+                                const retryResponse = await fetch(apiEndpoint, {
+                                    method: 'POST',
+                                    headers: {
+                                        'Content-Type': 'application/json',
+                                        'Authorization': `Bearer ${this.tokens.access_token}`,
+                                        'x-request-id': require('crypto').randomUUID()
+                                    },
+                                    body: JSON.stringify(requestBody)
+                                });
+
+                                if (!retryResponse.ok) {
+                                    // If retry also fails, then refresh failed or new token is bad
+                                    this.triggerAutoAuth();
+                                    this.tokens = null; // Force reload on next attempt
+                                    return {
+                                        success: false,
+                                        error: `Token refresh failed. Authentication launched in new window.`
+                                    };
+                                }
+                                response = retryResponse;
+                            } else {
+                                // Refresh token failed to get new token
+                                this.triggerAutoAuth();
+                                this.tokens = null; // Force reload on next attempt
+                                return {
+                                    success: false,
+                                    error: `Token refresh failed. Authentication launched in new window.`
+                                };
+                            }
+                        } catch (refreshError) {
+                            console.error('Token refresh error:', refreshError.message);
+                            this.triggerAutoAuth();
+                            this.tokens = null; // Force reload on next attempt
+                            return {
+                                success: false,
+                                error: `Token refresh failed. Authentication launched in new window.`
+                            };
+                        }
+                    } else {
+                        // No refresh token available - need to re-authenticate
+                        this.triggerAutoAuth();
+                        this.tokens = null; // Force reload on next attempt
+                        return {
+                            success: false,
+                            error: 'Session expired. Authentication launched in new window.'
+                        };
+                    }
+                } else {
+                    const errorText = await response.text();
+                    return {
+                        success: false,
+                        error: `API error: ${response.status} - ${errorText}`,
+                        response: ''
+                    };
+                }
             }
 
+            // Handle non-streaming response for CJS
             const data = await response.json();
             const responseText = data.choices?.[0]?.message?.content || '';
 
@@ -456,7 +590,11 @@ IMPORTANT RULES:
                 usage: data.usage
             };
         } catch (error) {
-            console.error('Vision API error:', error.message);
+            console.error('Qwen API error:', error.message);
+            // If it's a 401, trigger auth
+            if (error.message && error.message.includes('401')) {
+                this.triggerAutoAuth();
+            }
             if (error.message.includes('authenticate') || error.message.includes('token')) {
                 return {
                     success: true,

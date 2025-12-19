@@ -216,6 +216,15 @@ switch ($Command.ToLower()) {
         Write-Host "Pressed: $k"
     }
 
+    "startmenu" {
+        # More reliable than LWIN on some systems/contexts: Ctrl+Esc opens Start.
+        [Win32]::keybd_event(0x11, 0, 0, 0)     # CTRL down
+        [Win32]::keybd_event(0x1B, 0, 0, 0)     # ESC down
+        [Win32]::keybd_event(0x1B, 0, 0x02, 0)  # ESC up
+        [Win32]::keybd_event(0x11, 0, 0x02, 0)  # CTRL up
+        Write-Host "Opened Start menu"
+    }
+
     "keydown" {
         if ($Params.Count -lt 1) { Write-Error "Usage: keydown KEYNAME"; exit 1 }
         $k = $Params[0].ToUpper()
@@ -1436,6 +1445,7 @@ switch ($Command.ToLower()) {
         }
     }
 
+    "listchildren" {
         # List child elements of a UI element (for exploring UI structure)
         if ($Params.Count -lt 1) { Write-Error "Usage: listchildren 'Parent Element Name'"; exit 1 }
         $parentName = $Params -join " "
@@ -1467,6 +1477,6 @@ switch ($Command.ToLower()) {
     }
 
     default {
-        Write-Host "Commands: mouse, mousemove, click, rightclick, doubleclick, middleclick, drag, scroll, type, key, keydown, keyup, hotkey, screen, screenshot, region, color, ocr, find, findall, findby, uiclick, uiclickall, uipress, focus, waitfor, waitforcolor, waitforpage, browse, googlesearch, playwright, open, apps, window, kill, volume, brightness, browsercontrol, gettext, clipboard, listchildren"
+        Write-Host "Commands: mouse, mousemove, click, rightclick, doubleclick, middleclick, drag, scroll, type, key, startmenu, keydown, keyup, hotkey, screen, screenshot, region, color, ocr, find, findall, findby, uiclick, uiclickall, uipress, focus, waitfor, waitforcolor, waitforpage, browse, googlesearch, playwright, open, apps, window, kill, volume, brightness, browsercontrol, gettext, clipboard, listchildren"
     }
 }

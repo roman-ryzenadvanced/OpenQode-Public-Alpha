@@ -687,10 +687,16 @@ function showProjectMenu() {
 (async () => {
     const qwen = getQwen();
     const authed = await qwen.checkAuth();
-    if (!authed) {
+    if (!authed || !authed.authenticated) {
         print(`\n${c.yellow}Authentication required. Launching web login...${c.reset}\n`);
 
+        // Use node bin/auth.js - the working method
         const authScript = path.join(__dirname, 'auth.js');
+
+        if (!fs.existsSync(authScript)) {
+            print(`${c.red}auth.js not found at: ${authScript}${c.reset}\n`);
+            process.exit(1);
+        }
 
         await new Promise((resolve) => {
             const child = spawn('node', [authScript], {
@@ -704,14 +710,16 @@ function showProjectMenu() {
                     resolve();
                 } else {
                     print(`\n${c.red}Authentication failed or was cancelled.${c.reset}\n`);
+                    print(`${c.dim}You can try: node bin/auth.js${c.reset}\n`);
                     process.exit(1);
                 }
             });
         });
 
+
         // Re-check auth
         const recheck = await qwen.checkAuth();
-        if (!recheck) {
+        if (!recheck || !recheck.authenticated) {
             process.exit(1);
         }
     }

@@ -1,0 +1,9 @@
+{
+  "name": "Goose Ultra IDE",
+  "description": "A state-driven, project-first vibe coding platform with integrated, gated automation for Desktop, Browser, and Server workflows.",
+  "requestFramePermissions": [
+    "camera",
+    "microphone",
+    "geolocation"
+  ]
+}
