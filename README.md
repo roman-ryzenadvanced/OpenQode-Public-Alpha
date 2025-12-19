@@ -81,6 +81,8 @@ chmod +x install-linux.sh OpenQode.sh
 
 The main attraction - a full-featured desktop IDE built with Electron:
 
+![Game Dev Mode](assets/screenshots/goose-ultra-game-dev.png)
+
 - **Visual Blueprint System** - Describe what you want, get a plan, approve, and build
 - **Live Preview** - See your application rendered in real-time
 - **Code Editor** - Monaco editor with syntax highlighting
