@@ -3,24 +3,28 @@
 **The Next-Generation AI-Powered IDE for Modern Developers.**  
 *Powered by Qwen AI • Built with Electron • Full-Stack Development Made Easy*
 
-![Goose Ultra Interface](assets/screenshots/next-gen-1.png)
+![Goose Ultra Interface](assets/screenshots/goose-ultra-interface.png)
+
+---
+
+## 🚀 Full-Auto Installation (One Command)
+
+Run this in your terminal to clone, install dependencies, and build everything automatically:
+
+**Windows (PowerShell):**
+```powershell
+git clone https://github.com/roman-ryzenadvanced/OpenQode-Public-Alpha.git; cd OpenQode-Public-Alpha; npm install --legacy-peer-deps; cd bin/goose-ultra-final; npm install --legacy-peer-deps; npm run build; cd ../..; Write-Host "✅ OpenQode is ready. Run OpenQode.bat to start." -ForegroundColor Green
+```
 
 ---
 
 ## 🎯 What is OpenQode?
 
-OpenQode is a comprehensive AI coding assistant that brings the power of large language models directly to your development workflow. The flagship **Goose Ultra** application provides a beautiful, feature-rich IDE experience with:
-
-- 🤖 **AI-Powered Code Generation** - Generate entire applications from natural language descriptions
-- 🎨 **Modern UI/UX** - Glass morphism design with smooth animations
-- 📁 **Project Management** - Create, manage, and iterate on multiple projects
-- 🔧 **Vi Control Panel** - Computer automation, browser control, and more
-- 💬 **Intelligent Chat** - Context-aware conversations with file attachments
-- 🧠 **Memory System** - The AI remembers your preferences and project context
+OpenQode is a comprehensive AI coding assistant that brings the power of large language models directly to your development workflow. The flagship **Goose Ultra** application provides a beautiful, feature-rich IDE experience.
 
 ---
 
-## ⚡ Quick Start
+## ⚡ Quick Start (Manual)
 
 ### Windows
 ```batch
