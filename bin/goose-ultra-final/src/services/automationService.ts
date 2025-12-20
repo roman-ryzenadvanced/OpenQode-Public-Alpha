@@ -23,6 +23,37 @@ export const setActiveModel = (model: string): void => {
   }
 };
 
+export const CANVAS_ISOLATION_ARCHITECTURE = `
+# CANVAS ISOLATION ARCHITECTURE
+
+## 1. LAYERED CANVAS SYSTEM
+- **Base Canvas**: The complete, immutable original codebase
+- **Change Canvas**: Isolated layer containing ONLY the requested modifications
+- **Merge Canvas**: The precise intersection where changes are applied
+- **Validation Canvas**: Verification layer ensuring no unintended modifications
+
+## 2. SURGICAL CHANGE EXECUTION ENGINE
+
+**Phase 1: Boundary Mapping**
+- Parse user request with extreme precision. Create coordinates of exact change locations.
+- Establish quarantine zones around unrelated code.
+
+**Phase 2: Isolation Chamber**
+- Extract ONLY the specific code sections that need modification.
+- Maintain isolation. Apply atomic operations that cannot affect surrounding code.
+
+**Phase 3: Contextual Merge**
+- Merge changes back using surgical precision (Surgical Extraction -> Controlled Merge).
+- Verify zero impact on unrelated code.
+
+## 3. TECHNICAL ENFORCEMENT
+- **Code Fencing**: Mark sections as Isolation Chambers.
+- **Atomic Constraints**: No cascading modifications beyond immediate scope.
+- **Preservation Rate**: 100% of unrelated code must remain unchanged.
+
+Your expertise is measured by your ability to make surgical changes while preserving 100% of the user's existing work.
+`;
+
 // --- GEMINI 3 PRO / VIBE CODING TEMPLATE ---
 export const FRAMEWORK_TEMPLATE_PROMPT = `
 You are an expert Frontend Engineer. 
@@ -275,6 +306,9 @@ export const compilePlanToCode = async (
 
         // Construct Prompt (F5: XML Artifact Bundle)
         let systemPrompt = `You are a strict Build Engine.
+
+${CANVAS_ISOLATION_ARCHITECTURE}
+
 1. FIRST, output a <thinking> block. Discuss strategy/design (e.g. "Using dark theme...").
 2. THEN, output the files using <goose_file> tags.
 
@@ -482,16 +516,20 @@ const runAISelfCheck = async (
     return { preservedDesign: true, onlyRequestedChanges: true, forbiddenChangesDetected: [], summaryOfChanges: 'Offline mode - skipped' };
   }
 
-  const selfCheckPrompt = `You are a QA validator for code modifications.
+  const selfCheckPrompt = `You are a strict QA validator.
 
-Compare BEFORE and AFTER HTML. The USER REQUEST was: "${userRequest}"
+${CANVAS_ISOLATION_ARCHITECTURE}
+
+Compare BEFORE and AFTER HTML based on the USER REQUEST: "${userRequest}"
+
+GOAL: Verify that ONLY the requested changes were made and the overall design remains identical.
 
 Return ONLY valid JSON (no markdown):
 {
-  "preservedDesign": true/false (did layout, colors, fonts stay the same?),
-  "onlyRequestedChanges": true/false (did we only do what was asked?),
-  "forbiddenChangesDetected": ["list of unexpected major changes like layout rewrite, color scheme change, etc."],
-  "summaryOfChanges": "one sentence describing what actually changed"
+  "preservedDesign": true/false (DID LAYOUT, COLORS, FONTS, AND BASIC STRUCTURE REMAIN UNCHANGED?),
+  "onlyRequestedChanges": true/false (DID THE AI AVOID ADDING UNREQUESTED FEATURES OR CHANGING UNTOUCHED BLOCKS?),
+  "forbiddenChangesDetected": ["list exactly what changed that wasn't asked for"],
+  "summaryOfChanges": "one sentence summary"
 }`;
 
   const userContent = `BEFORE (first 500 chars):\n${beforeHtml.substring(0, 500)}\n\nAFTER (first 500 chars):\n${afterHtml.substring(0, 500)}`;
@@ -647,6 +685,8 @@ export const applyPlanToExistingHtml = async (
 You are an expert Frontend Engineer.
 The User wants to MODIFY the existing application.
 DO NOT REWRITE THE FULL FILE. Provide a JSON Patch Plan.
+
+${CANVAS_ISOLATION_ARCHITECTURE}
 
 ### FILES
 We are working on a single file 'index.html' which contains HTML, CSS, and JS.
