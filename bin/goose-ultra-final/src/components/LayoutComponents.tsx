@@ -4,6 +4,8 @@ import { Icons } from '../constants';
 import { GlobalMode, OrchestratorState, TabId } from '../types';
 import { applyPlanToExistingHtml, deleteProjectFromDisk, generateMockFiles, compilePlanToCode, MODERN_TEMPLATE_PROMPT, FRAMEWORK_TEMPLATE_PROMPT, loadProjectFilesFromDisk, writeLastActiveProjectId, ensureProjectOnDisk, loadProjectMemories, deleteMemory, updateMemory, MemoryRecord, formatMemoriesForPrompt, retrieveRelevantMemories } from '../services/automationService';
 import { classifyIntent, enhancePromptWithContext, loadProjectManifest, initializeProjectContext, IntentAnalysis, ProjectManifest, CLIE_VERSION } from '../services/ContextEngine';
+import { useUser, LogoutDialog } from './UserAuth';
+import QwenAuthDialog from './QwenAuthDialog';
 
 // --- Shared Constants ---
 const FRAMEWORK_KEYWORDS = ['react', 'vue', 'svelte', 'bootstrap', 'jquery', 'three.js', 'p5.js', 'angular', 'alpine'];
@@ -463,10 +465,44 @@ const StatusDot = ({ active, label }: { active: boolean, label: string }) => (
 
 export const Sidebar = () => {
   const { state, dispatch } = useOrchestrator();
+  const { session, logout } = useUser();
   if (!state.sidebarOpen) return null;
   const [query, setQuery] = useState('');
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState('');
+  const [showLogoutDialog, setShowLogoutDialog] = useState(false);
+  const [showQwenAuthDialog, setShowQwenAuthDialog] = useState(false);
+  const [qwenAuthStatus, setQwenAuthStatus] = useState<{ isAuthenticated: boolean; isValid: boolean }>({ isAuthenticated: false, isValid: false });
+  const [userStats, setUserStats] = useState({ projectCount: 0, chatCount: 0, totalSizeBytes: 0 });
+
+  // Check Qwen auth status on mount
+  useEffect(() => {
+    const checkQwenAuth = async () => {
+      const electron = (window as any).electron;
+      if (electron?.qwenAuth?.getStatus) {
+        const status = await electron.qwenAuth.getStatus();
+        setQwenAuthStatus(status);
+      }
+    };
+    checkQwenAuth();
+  }, []);
+
+  // Load user stats when logout dialog opens
+  useEffect(() => {
+    if (showLogoutDialog && session?.userId) {
+      const electron = (window as any).electron;
+      if (electron?.user?.getStats) {
+        electron.user.getStats(session.userId).then(setUserStats);
+      }
+    }
+  }, [showLogoutDialog, session?.userId]);
+
+  const handleLogout = async (cleanData: boolean) => {
+    setShowLogoutDialog(false);
+    await logout(cleanData);
+    // Force page reload to show login screen
+    window.location.reload();
+  };
 
   const handleSelectProject = async (projectId: string) => {
     dispatch({ type: 'SELECT_PROJECT', projectId });
@@ -716,24 +752,27 @@ export const Sidebar = () => {
 
           {/* Qwen OAuth Status */}
           <div
-            className="flex items-center gap-2 text-xs cursor-pointer transition-colors p-2 hover:bg-white/5 rounded-lg mx-2 group"
-            onClick={() => {
-              // Trigger Qwen OAuth flow
-              const electron = (window as any).electron;
-              if (electron?.openQwenAuth) {
-                electron.openQwenAuth();
-              }
-            }}
-            title="Click to authenticate with Qwen"
+            className={`flex items-center gap-2 text-xs cursor-pointer transition-colors p-2 hover:bg-white/5 rounded-lg mx-2 group ${qwenAuthStatus.isAuthenticated ? '' : 'opacity-70'}`}
+            onClick={() => setShowQwenAuthDialog(true)}
+            title={qwenAuthStatus.isAuthenticated ? "Qwen Cloud connected • Click to refresh" : "Click to authenticate with Qwen"}
           >
-            <div className="w-6 h-6 rounded-lg bg-emerald-500/20 flex items-center justify-center border border-emerald-500/30">
-              <span className="text-emerald-400 font-bold text-xs">Q</span>
+            <div className={`w-6 h-6 rounded-lg flex items-center justify-center border ${qwenAuthStatus.isAuthenticated
+              ? 'bg-emerald-500/20 border-emerald-500/30'
+              : 'bg-zinc-800 border-white/10'
+              }`}>
+              <span className={`font-bold text-xs ${qwenAuthStatus.isAuthenticated ? 'text-emerald-400' : 'text-zinc-500'}`}>Q</span>
             </div>
             <div className="flex-1 min-w-0">
               <div className="text-zinc-300 text-xs font-medium">Qwen Cloud</div>
-              <div className="text-[9px] text-emerald-500">Connected • Free Tier</div>
+              <div className={`text-[9px] ${qwenAuthStatus.isAuthenticated ? 'text-emerald-500' : 'text-zinc-600'}`}>
+                {qwenAuthStatus.isAuthenticated ? (qwenAuthStatus.isValid ? 'Connected • Ready' : 'Token expired') : 'Click to authenticate'}
+              </div>
             </div>
-            <Icons.CheckCircle className="w-3.5 h-3.5 text-emerald-500" />
+            {qwenAuthStatus.isAuthenticated ? (
+              <Icons.CheckCircle className="w-3.5 h-3.5 text-emerald-500" />
+            ) : (
+              <Icons.Plus className="w-3.5 h-3.5 text-zinc-500 group-hover:text-white transition-colors" />
+            )}
           </div>
 
           {/* Ollama Cloud Status */}
@@ -789,8 +828,54 @@ export const Sidebar = () => {
             </div>
           )}
         </div>
+
+        {/* User Session Section */}
+        {session && (
+          <div className="mt-auto pt-4 border-t border-white/5">
+            <div className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-3 px-2 flex items-center gap-2">
+              <Icons.User className="w-3 h-3" /> Account
+            </div>
+            <div className="px-2 mb-2">
+              <div className="bg-white/5 border border-white/10 rounded-xl p-3">
+                <div className="text-xs text-white font-medium truncate">{session.displayName}</div>
+                <div className="text-[9px] text-zinc-500 mt-1">
+                  Logged in since {new Date(session.loginAt).toLocaleDateString()}
+                </div>
+              </div>
+            </div>
+            <div
+              onClick={() => setShowLogoutDialog(true)}
+              className="flex items-center gap-2 text-xs cursor-pointer transition-colors p-2 hover:bg-rose-500/10 rounded-lg mx-2 group text-zinc-400 hover:text-rose-400"
+              title="Logout"
+            >
+              <Icons.X className="w-3.5 h-3.5" />
+              <span>Logout</span>
+            </div>
+          </div>
+        )}
       </div>
-    </div >
+
+      {/* Dialogs */}
+      <LogoutDialog
+        isOpen={showLogoutDialog}
+        onClose={() => setShowLogoutDialog(false)}
+        onLogout={handleLogout}
+        userName={session?.displayName || 'User'}
+        stats={userStats}
+      />
+      <QwenAuthDialog
+        isOpen={showQwenAuthDialog}
+        onClose={() => setShowQwenAuthDialog(false)}
+        onSuccess={async () => {
+          // Refresh auth status after successful auth
+          const electron = (window as any).electron;
+          if (electron?.qwenAuth?.getStatus) {
+            const status = await electron.qwenAuth.getStatus();
+            setQwenAuthStatus(status);
+          }
+        }}
+      />
+    </div>
   );
 };
 
