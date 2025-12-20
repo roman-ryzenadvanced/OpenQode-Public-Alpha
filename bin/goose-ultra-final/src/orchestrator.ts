@@ -383,6 +383,8 @@ const reducer = (state: OrchestratorContext, action: Action): OrchestratorContex
       return { ...state, apexModeEnabled: !state.apexModeEnabled };
 
     case 'SET_CHAT_MODEL':
+      // Sync to localStorage so services can read it
+      try { localStorage.setItem('goose-active-model', action.model); } catch { }
       return { ...state, chatSettings: { ...state.chatSettings, activeModel: action.model } };
 
     case 'TOGGLE_OLLAMA':

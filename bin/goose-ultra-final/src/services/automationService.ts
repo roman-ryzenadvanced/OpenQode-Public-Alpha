@@ -4,6 +4,25 @@ import { SafeGenStreamer } from './StreamHandler';
 
 const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
+// Global model accessor - reads from localStorage to support Ollama integration
+// This is updated by the React orchestrator when the model changes
+export const getActiveModel = (): string => {
+  try {
+    const stored = localStorage.getItem('goose-active-model');
+    return stored || 'qwen-coder-plus';
+  } catch {
+    return 'qwen-coder-plus';
+  }
+};
+
+export const setActiveModel = (model: string): void => {
+  try {
+    localStorage.setItem('goose-active-model', model);
+  } catch {
+    // Ignore storage errors
+  }
+};
+
 // --- GEMINI 3 PRO / VIBE CODING TEMPLATE ---
 export const FRAMEWORK_TEMPLATE_PROMPT = `
 You are an expert Frontend Engineer. 
@@ -144,7 +163,7 @@ OUTPUT ONLY JSON:
 
     electron.startChat([
       { role: 'system', content: prompt }
-    ], 'qwen-coder-plus');
+    ], getActiveModel());
   });
 };
 
@@ -311,7 +330,7 @@ RULES:
         electron.startChat([
           { role: 'system', content: systemPrompt },
           { role: 'user', content: userContent }
-        ], 'qwen-coder-plus');
+        ], getActiveModel());
       });
 
       // F5: Parse XML Bundle for QA
@@ -512,7 +531,7 @@ Return ONLY valid JSON (no markdown):
     electron.startChat([
       { role: 'system', content: selfCheckPrompt },
       { role: 'user', content: userContent }
-    ], 'qwen-coder-plus');
+    ], getActiveModel());
   });
 };
 
@@ -789,7 +808,7 @@ If the request requires a FULL REDESIGN (changing >50% of layout or colors), set
         { role: 'system', content: PATCH_PROMPT },
         { role: 'user', content: `CURRENT_HTML (snippet):\n${currentHtml.substring(0, 5000) + "..."}\n\nREQUEST:\n${plan}` }
       ],
-      'qwen-coder-plus'
+      getActiveModel()
     );
   });
 };
@@ -1222,7 +1241,7 @@ Only extract if clearly stated. Do not invent.`;
     electron.startChat([
       { role: 'system', content: extractionPrompt },
       { role: 'user', content: `Extract memories from:\n${text.substring(0, 2000)}` }
-    ], 'qwen-coder-plus');
+    ], getActiveModel());
   });
 };
 
