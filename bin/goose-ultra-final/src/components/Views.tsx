@@ -1445,41 +1445,50 @@ Start with "# 🔧 Repair Plan" and be concise.`;
                 </button>
                 <button
                     onClick={async () => {
-                        if (confirm('Generate a Node.js/Express backend for this frontend?')) {
+                        if (confirm('Export this frontend as a UX Package for external backend development?')) {
                             const htmlContent = state.files['index.html'] || '';
+                            const cssContent = state.files['style.css'] || '';
+                            const jsContent = state.files['script.js'] || '';
+                            const projectId = state.activeProject?.id || 'unknown_project';
+
                             if (!htmlContent) {
-                                alert('No frontend code found to analyze.');
+                                alert('No frontend code found to export.');
                                 return;
                             }
 
-                            // Switch to Build mode (Plan tab) to show progress
-                            dispatch({ type: 'SET_MODE', mode: GlobalMode.Build });
-                            dispatch({ type: 'SET_TAB', tab: TabId.Plan });
+                            const uxPackage = {
+                                meta: {
+                                    project: state.activeProject?.name || "Vibe Project",
+                                    exportedAt: new Date().toISOString(),
+                                    generator: "Goose Ultra Vibe Engine",
+                                    description: "Frontend UX Package for Backend Integration"
+                                },
+                                files: {
+                                    "index.html": htmlContent,
+                                    "style.css": cssContent,
+                                    "script.js": jsContent
+                                },
+                                instructions: "This package contains the complete frontend UI. Use this to build the backend logic."
+                            };
 
-                            const prompt = `[BACKEND_REQUEST]
-I need a backend for my frontend.
-Here is the current HTML/JS code:
-\`\`\`html
-${htmlContent.substring(0, 15000)}... (truncated)
-\`\`\`
+                            const blob = new Blob([JSON.stringify(uxPackage, null, 2)], { type: 'application/json' });
+                            const url = URL.createObjectURL(blob);
+                            const a = document.createElement('a');
+                            a.href = url;
+                            a.download = `ux_package_${projectId}.json`;
+                            document.body.appendChild(a);
+                            a.click();
+                            document.body.removeChild(a);
+                            URL.revokeObjectURL(url);
 
-Please build a 'server.js' file using Express that:
-1. Serves this static file.
-2. Implements any API endpoints found in the fetch() calls.
-3. Provides mock data for those endpoints.`;
-
-                            dispatch({ type: 'START_REQUEST', sessionId: Date.now().toString(), messageDraft: prompt });
-
-                            // We rely on the LayoutComponents handler to pick this up, 
-                            // but we need to ensure the system prompt knows how to handle it.
-                            // Ideally, we'd invoke the automationService directly, but flowing through chat maintains state consistency.
+                            dispatch({ type: 'ADD_LOG', log: { id: Date.now().toString(), timestamp: Date.now(), type: 'system', message: "UX Package exported successfully." } });
                         }
                     }}
-                    className="ml-2 px-3 py-2 rounded-xl text-xs font-bold border border-white/10 bg-indigo-500/10 text-indigo-300 hover:bg-indigo-500/20 hover:text-white transition-colors flex items-center gap-2"
-                    title="Generate Backend Service"
+                    className="ml-2 px-3 py-2 rounded-xl text-xs font-bold border border-white/10 bg-cyan-500/10 text-cyan-300 hover:bg-cyan-500/20 hover:text-white transition-colors flex items-center gap-2"
+                    title="Download Frontend for Backend Dev"
                 >
-                    <Icons.Server className="w-3.5 h-3.5" />
-                    Build Backend
+                    <Icons.Package className="w-3.5 h-3.5" />
+                    Generate UX Package
                 </button>
             </div>
 
