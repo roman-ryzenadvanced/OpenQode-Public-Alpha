@@ -2472,11 +2472,12 @@ Format: { "ideas": [{ "title": "Short Title", "subtitle": "One line", "tag": "To
       }
 
 
-      // --- REPAIR MODE (F3: Retention & Match) ---
-      // "Broken frontend is treated as a REPAIR task"
-      const originalIntent = state.activeProject?.originalPrompt || "Unknown Intent";
+      if (isQaFailureArtifact) {
+        // --- REPAIR MODE (F3: Retention & Match) ---
+        // "Broken frontend is treated as a REPAIR task"
+        const originalIntent = state.activeProject?.originalPrompt || "Unknown Intent";
 
-      systemPrompt = `[SYSTEM INSTRUCTION]: REPAIR MODE ACTIVE.
+        systemPrompt = `[SYSTEM INSTRUCTION]: REPAIR MODE ACTIVE.
          
 The previous build FAILED Quality Assurance (Unstyled/Broken) or was completely lost. 
 The user wants to FIX/REDO it.
@@ -2489,32 +2490,32 @@ YOUR GOAL: Propose a repair plan to fix the broken output while STAYING TRUE to 
 2. YOU MUST PROPOSE A VALID, STYLED IMPLEMENTATION.
 3. Start plan with '[PLAN]'.
 4. Do NOT ask for clarification. JUST FIX IT.`;
-    } else if (isRedesignConfirmed) {
-      // --- REDESIGN APPROVED MODE ---
-      systemPrompt = `[SYSTEM INSTRUCTION]: REDESIGN APPROVED.
+      } else if (isRedesignConfirmed) {
+        // --- REDESIGN APPROVED MODE ---
+        systemPrompt = `[SYSTEM INSTRUCTION]: REDESIGN APPROVED.
          
 The user has explicitely authorized a redesign.
 1. You may change layout, colors, and structure.
 2. Ignore previous Design Lock constraints.
 3. Propose a comprehensive plan starting with '[PLAN]'.`;
-    } else {
-      // --- CLIE: CONTEXT-LOCKED EXECUTION ---
-      try {
-        // 1. Analyze Intent
-        const intent = classifyIntent(userPrompt);
+      } else {
+        // --- CLIE: CONTEXT-LOCKED EXECUTION ---
+        try {
+          // 1. Analyze Intent
+          const intent = classifyIntent(userPrompt);
 
-        // 2. Load Manifest (Context Soul)
-        let manifest = await loadProjectManifest(state.activeProject.id);
-        if (!manifest && state.activeProject.originalPrompt) {
-          // Lazy init if missing
-          await initializeProjectContext(state.activeProject, state.activeProject.originalPrompt);
-          manifest = await loadProjectManifest(state.activeProject.id);
-        }
+          // 2. Load Manifest (Context Soul)
+          let manifest = await loadProjectManifest(state.activeProject.id);
+          if (!manifest && state.activeProject.originalPrompt) {
+            // Lazy init if missing
+            await initializeProjectContext(state.activeProject, state.activeProject.originalPrompt);
+            manifest = await loadProjectManifest(state.activeProject.id);
+          }
 
-        // 3. Enhance Prompt
-        const enhancedContext = enhancePromptWithContext(userPrompt, manifest, intent);
+          // 3. Enhance Prompt
+          const enhancedContext = enhancePromptWithContext(userPrompt, manifest, intent);
 
-        systemPrompt = `[CLIE v${CLIE_VERSION}] [SYSTEM INSTRUCTION]: EXECUTION MODE LOCKED.
+          systemPrompt = `[CLIE v${CLIE_VERSION}] [SYSTEM INSTRUCTION]: EXECUTION MODE LOCKED.
 
 ${enhancedContext}
 
@@ -2531,10 +2532,10 @@ BEFORE proposing changes, state:
 - MUST_NOT_TOUCH: [layout, colors, typography, existing components, structure]
 
 Then provide a BRIEF plan starting with '[PLAN]' describing ONLY the changes needed.`;
-      } catch (e) {
-        console.error('[CLIE] Failed to enhance prompt:', e);
-        // Fallback to standard
-        systemPrompt = `[SYSTEM INSTRUCTION]: MODIFICATION MODE with DESIGN LOCK ENABLED.
+        } catch (e) {
+          console.error('[CLIE] Failed to enhance prompt:', e);
+          // Fallback to standard
+          systemPrompt = `[SYSTEM INSTRUCTION]: MODIFICATION MODE with DESIGN LOCK ENABLED.
           
 ${memoryBlock}
 
@@ -2549,644 +2550,644 @@ DESIGN LOCK RULES:
 3. ONLY implement the request.
 
 Brief plan starting with '[PLAN]'.`;
-      }
-    }
-  } else {
-    // P0-WF1: FORCE PLAN-FIRST
-    // "Every idea must produce a plan first"
-    // We ignore overrideInput / one-shot triggers for the initial build request.
-    requestKind = 'plan';
-  systemPrompt = `[SYSTEM INSTRUCTION]: Propose an implementation plan starting with '[PLAN]'. DO NOT output code yet.`;
-}
-
-if (state.preferredFramework) {
-  systemPrompt += `\n\n[USER PREFERENCE]: The user has explicitly requested to use the "${state.preferredFramework}" framework. You MUST prioritize this framework, along with its standard ecosystem (e.g. if React, use typical React libs; if Tailwind, use utility classes).`;
-}
-
-// IMMEDIATE FEEDBACK: If we are planning, switch to Plan tab immediately so user sees the stream
-if (requestKind === 'plan') {
-  dispatch({ type: 'TRANSITION', to: OrchestratorState.Planning });
-  dispatch({ type: 'SET_TAB', tab: TabId.Plan });
-  dispatch({ type: 'UPDATE_PLAN', plan: "# Analyzing Request...\n\n*Forging blueprint based on 2025 System Standards...*" });
-}
-
-setThinkingLabel('Thinking...');
-
-if ((window as any).electron) {
-  const sessionId = Date.now().toString();
-  let currentProjectId = state.activeProject?.id || null;
-
-  if (!currentProjectId) {
-    const id = (globalThis.crypto && 'randomUUID' in globalThis.crypto) ? (globalThis.crypto as any).randomUUID() : Date.now().toString();
-    const name = userPrompt.substring(0, 20) || "New Project";
-    dispatch({ type: 'CREATE_PROJECT', id, createdAt: Date.now(), name });
-    void ensureProjectOnDisk({ id, name, slug: name.toLowerCase().replace(/\s+/g, '-'), createdAt: Date.now(), description: 'New Vibe Project' });
-    void writeLastActiveProjectId(id);
-    currentProjectId = id;
-  }
-
-  const targetProjectId = currentProjectId;
-
-
-
-  (window as any).electron.removeChatListeners();
-
-
-
-  const handleResponse = (response: string) => {
-    clearTimeout(timeoutId);
-    // Session gating: ignore if session was cancelled
-    if (state.activeRequestStatus === 'cancelled') {
-      console.log('[ChatPanel] Ignoring response from cancelled session');
-      return;
-    }
-
-
-    dispatch({ type: 'ADD_LOG', log: { id: Date.now().toString(), timestamp: Date.now(), type: 'system', message: response } });
-    const hasDoctype = response.includes('<!DOCTYPE html>');
-    const isPlan = isPlanMessage(response);
-
-    if (requestKind === 'plan') {
-      // F5: Plan Streaming handled via onChatChunk below (lines 1550+)
-      // Here we just finalize the plan.
-
-      // FORCE transition to PlanReady regardless of tag presence
-      // We demanded a plan, so we treat the output as a plan.
-      dispatch({ type: 'UPDATE_PLAN', plan: response });
-      // LAYER 1 FIX: Transition to PlanReady - user MUST approve before building
-      dispatch({ type: 'TRANSITION', to: OrchestratorState.PlanReady });
-      dispatch({ type: 'SET_TAB', tab: TabId.Plan });
-      dispatch({ type: 'END_BUILD_SESSION', sessionId });
-      dispatch({ type: 'UPDATE_STREAMING_CODE', code: null }); // Clear stream
-      finalizeRequest();
-      return;
-    }
-
-    if (isChatMode) {
-      // IT Expert: Check for JSON ActionProposal
-      if (state.chatPersona === 'it') {
-        try {
-          // Try to extract JSON from response
-          let jsonStr = response.trim();
-          // Strip markdown fences if present
-          jsonStr = jsonStr.replace(/```json/gi, '').replace(/```/g, '').trim();
-          // Find first { and last }
-          const first = jsonStr.indexOf('{');
-          const last = jsonStr.lastIndexOf('}');
-          if (first !== -1 && last > first) {
-            jsonStr = jsonStr.substring(first, last + 1);
-            const parsed = JSON.parse(jsonStr);
-            if (parsed.runner && parsed.script && parsed.proposalId) {
-              // Valid ActionProposal
-              const proposal: import('../types').ActionProposal = {
-                ...parsed,
-                status: 'pending'
-              };
-              dispatch({ type: 'SET_PENDING_PROPOSAL', proposal });
-              finalizeRequest();
-              return;
-            }
-          }
-        } catch (e) {
-          // Not valid JSON, treat as normal chat response
-          console.log('[IT Expert] Response is not a valid proposal, rendering as chat.');
         }
       }
-      finalizeRequest();
-      return;
+    } else {
+      // P0-WF1: FORCE PLAN-FIRST
+      // "Every idea must produce a plan first"
+      // We ignore overrideInput / one-shot triggers for the initial build request.
+      requestKind = 'plan';
+      systemPrompt = `[SYSTEM INSTRUCTION]: Propose an implementation plan starting with '[PLAN]'. DO NOT output code yet.`;
     }
 
+    if (state.preferredFramework) {
+      systemPrompt += `\n\n[USER PREFERENCE]: The user has explicitly requested to use the "${state.preferredFramework}" framework. You MUST prioritize this framework, along with its standard ecosystem (e.g. if React, use typical React libs; if Tailwind, use utility classes).`;
+    }
 
-  };
-
-  (window as any).electron.onChatComplete(handleResponse);
-  (window as any).electron.onChatError((error: string) => {
-    clearTimeout(timeoutId);
-    // Session gating
-    if (state.activeRequestStatus === 'cancelled') return;
-
+    // IMMEDIATE FEEDBACK: If we are planning, switch to Plan tab immediately so user sees the stream
     if (requestKind === 'plan') {
-      dispatch({ type: 'UPDATE_PLAN', plan: "# Planning Failed\n\nThe orchestrator encountered an error while analyzing your request:\n\n> " + error + "\n\nPlease try again." });
+      dispatch({ type: 'TRANSITION', to: OrchestratorState.Planning });
+      dispatch({ type: 'SET_TAB', tab: TabId.Plan });
+      dispatch({ type: 'UPDATE_PLAN', plan: "# Analyzing Request...\n\n*Forging blueprint based on 2025 System Standards...*" });
     }
-    dispatch({ type: 'ADD_LOG', log: { id: Date.now().toString(), timestamp: Date.now(), type: 'error', message: "Error: " + error } });
-    dispatch({ type: 'REQUEST_ERROR' });
-    if (!isChatMode && requestKind !== 'plan') {
-      dispatch({ type: 'END_BUILD_SESSION', sessionId });
-      dispatch({ type: 'UPDATE_STREAMING_CODE', code: null });
-    }
-    setIsThinking(false);
+
     setThinkingLabel('Thinking...');
+
     if ((window as any).electron) {
+      const sessionId = Date.now().toString();
+      let currentProjectId = state.activeProject?.id || null;
+
+      if (!currentProjectId) {
+        const id = (globalThis.crypto && 'randomUUID' in globalThis.crypto) ? (globalThis.crypto as any).randomUUID() : Date.now().toString();
+        const name = userPrompt.substring(0, 20) || "New Project";
+        dispatch({ type: 'CREATE_PROJECT', id, createdAt: Date.now(), name });
+        void ensureProjectOnDisk({ id, name, slug: name.toLowerCase().replace(/\s+/g, '-'), createdAt: Date.now(), description: 'New Vibe Project' });
+        void writeLastActiveProjectId(id);
+        currentProjectId = id;
+      }
+
+      const targetProjectId = currentProjectId;
+
+
+
       (window as any).electron.removeChatListeners();
+
+
+
+      const handleResponse = (response: string) => {
+        clearTimeout(timeoutId);
+        // Session gating: ignore if session was cancelled
+        if (state.activeRequestStatus === 'cancelled') {
+          console.log('[ChatPanel] Ignoring response from cancelled session');
+          return;
+        }
+
+
+        dispatch({ type: 'ADD_LOG', log: { id: Date.now().toString(), timestamp: Date.now(), type: 'system', message: response } });
+        const hasDoctype = response.includes('<!DOCTYPE html>');
+        const isPlan = isPlanMessage(response);
+
+        if (requestKind === 'plan') {
+          // F5: Plan Streaming handled via onChatChunk below (lines 1550+)
+          // Here we just finalize the plan.
+
+          // FORCE transition to PlanReady regardless of tag presence
+          // We demanded a plan, so we treat the output as a plan.
+          dispatch({ type: 'UPDATE_PLAN', plan: response });
+          // LAYER 1 FIX: Transition to PlanReady - user MUST approve before building
+          dispatch({ type: 'TRANSITION', to: OrchestratorState.PlanReady });
+          dispatch({ type: 'SET_TAB', tab: TabId.Plan });
+          dispatch({ type: 'END_BUILD_SESSION', sessionId });
+          dispatch({ type: 'UPDATE_STREAMING_CODE', code: null }); // Clear stream
+          finalizeRequest();
+          return;
+        }
+
+        if (isChatMode) {
+          // IT Expert: Check for JSON ActionProposal
+          if (state.chatPersona === 'it') {
+            try {
+              // Try to extract JSON from response
+              let jsonStr = response.trim();
+              // Strip markdown fences if present
+              jsonStr = jsonStr.replace(/```json/gi, '').replace(/```/g, '').trim();
+              // Find first { and last }
+              const first = jsonStr.indexOf('{');
+              const last = jsonStr.lastIndexOf('}');
+              if (first !== -1 && last > first) {
+                jsonStr = jsonStr.substring(first, last + 1);
+                const parsed = JSON.parse(jsonStr);
+                if (parsed.runner && parsed.script && parsed.proposalId) {
+                  // Valid ActionProposal
+                  const proposal: import('../types').ActionProposal = {
+                    ...parsed,
+                    status: 'pending'
+                  };
+                  dispatch({ type: 'SET_PENDING_PROPOSAL', proposal });
+                  finalizeRequest();
+                  return;
+                }
+              }
+            } catch (e) {
+              // Not valid JSON, treat as normal chat response
+              console.log('[IT Expert] Response is not a valid proposal, rendering as chat.');
+            }
+          }
+          finalizeRequest();
+          return;
+        }
+
+
+      };
+
+      (window as any).electron.onChatComplete(handleResponse);
+      (window as any).electron.onChatError((error: string) => {
+        clearTimeout(timeoutId);
+        // Session gating
+        if (state.activeRequestStatus === 'cancelled') return;
+
+        if (requestKind === 'plan') {
+          dispatch({ type: 'UPDATE_PLAN', plan: "# Planning Failed\n\nThe orchestrator encountered an error while analyzing your request:\n\n> " + error + "\n\nPlease try again." });
+        }
+        dispatch({ type: 'ADD_LOG', log: { id: Date.now().toString(), timestamp: Date.now(), type: 'error', message: "Error: " + error } });
+        dispatch({ type: 'REQUEST_ERROR' });
+        if (!isChatMode && requestKind !== 'plan') {
+          dispatch({ type: 'END_BUILD_SESSION', sessionId });
+          dispatch({ type: 'UPDATE_STREAMING_CODE', code: null });
+        }
+        setIsThinking(false);
+        setThinkingLabel('Thinking...');
+        if ((window as any).electron) {
+          (window as any).electron.removeChatListeners();
+        }
+      });
+
+      // F5: PLAN STREAMING - Attach listener BEFORE startChat
+      if (requestKind === 'plan') {
+        let planStreamBuffer = '';
+        (window as any).electron.onChatChunk((chunk: string) => {
+          planStreamBuffer += chunk;
+          // We use UPDATE_STREAMING_CODE so the Plan Tab (or overlay if visible) can see it.
+          // Note: PlanView must be capable of rendering streaming code if it's the active tab.
+          dispatch({ type: 'UPDATE_STREAMING_CODE', code: planStreamBuffer });
+        });
+      }
+
+      (window as any).electron.startChat([
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: userPrompt }
+      ], state.chatSettings.activeModel);
+
+    } else {
+      clearTimeout(timeoutId);
+      setTimeout(() => {
+        dispatch({ type: 'ADD_LOG', log: { id: Date.now().toString(), timestamp: Date.now(), type: 'system', message: "[OFFLINE] Simulated response." } });
+        finalizeRequest();
+      }, 1000);
     }
-  });
-
-  // F5: PLAN STREAMING - Attach listener BEFORE startChat
-  if (requestKind === 'plan') {
-    let planStreamBuffer = '';
-    (window as any).electron.onChatChunk((chunk: string) => {
-      planStreamBuffer += chunk;
-      // We use UPDATE_STREAMING_CODE so the Plan Tab (or overlay if visible) can see it.
-      // Note: PlanView must be capable of rendering streaming code if it's the active tab.
-      dispatch({ type: 'UPDATE_STREAMING_CODE', code: planStreamBuffer });
-    });
-  }
-
-  (window as any).electron.startChat([
-    { role: 'system', content: systemPrompt },
-    { role: 'user', content: userPrompt }
-  ], state.chatSettings.activeModel);
-
-} else {
-  clearTimeout(timeoutId);
-  setTimeout(() => {
-    dispatch({ type: 'ADD_LOG', log: { id: Date.now().toString(), timestamp: Date.now(), type: 'system', message: "[OFFLINE] Simulated response." } });
-    finalizeRequest();
-  }, 1000);
-}
   };
 
 
 
-const showStreaming = (state.state === OrchestratorState.Building) && state.activeBuildSessionId != null && state.streamingCode != null;
+  const showStreaming = (state.state === OrchestratorState.Building) && state.activeBuildSessionId != null && state.streamingCode != null;
 
-useEffect(() => {
-  if (!showStreaming) return;
-  const id = setInterval(() => {
-    setActiveTechIndex((i) => (techTags.length ? (i + 1) % techTags.length : 0));
-  }, 900);
-  return () => clearInterval(id);
-}, [showStreaming, techTags.length]);
+  useEffect(() => {
+    if (!showStreaming) return;
+    const id = setInterval(() => {
+      setActiveTechIndex((i) => (techTags.length ? (i + 1) % techTags.length : 0));
+    }, 900);
+    return () => clearInterval(id);
+  }, [showStreaming, techTags.length]);
 
-return (
-  <div className={`flex flex-col glass-panel z-20 transition-all duration-500 overflow-hidden relative ${state.chatDocked === 'bottom' ? 'h-96 w-[calc(100%-24px)] fixed bottom-3 left-3 rounded-2xl shadow-2xl border-t border-white/10' : 'w-96 m-3 rounded-2xl shadow-2xl'}`}>
+  return (
+    <div className={`flex flex-col glass-panel z-20 transition-all duration-500 overflow-hidden relative ${state.chatDocked === 'bottom' ? 'h-96 w-[calc(100%-24px)] fixed bottom-3 left-3 rounded-2xl shadow-2xl border-t border-white/10' : 'w-96 m-3 rounded-2xl shadow-2xl'}`}>
 
-    {/* STREAMING EDITOR OVERLAY (SLIDES IN) */}
-    <div
-      className={`absolute inset-0 bg-[#0B0B0C] z-30 flex flex-col transition-transform duration-500 ease-in-out ${showStreaming ? 'translate-x-0' : '-translate-x-full'}`}
-    >
-      <div className="p-3 border-b border-white/10 bg-zinc-900 flex items-center justify-between shadow-md z-10">
-        <div className="flex items-center gap-3">
-          <div className="flex items-center gap-2">
-            <div className="relative">
-              <div className="w-2 h-2 rounded-full bg-primary animate-ping absolute inset-0 opacity-75"></div>
-              <div className="w-2 h-2 rounded-full bg-primary relative z-10"></div>
-            </div>
-            <span className="text-xs font-mono font-bold text-zinc-300 tracking-wider">FORGING<span className="text-zinc-600">_</span>SEQUENCE</span>
-          </div>
-          {/* Real-time Metrics */}
-          <div className="h-4 w-px bg-white/10 mx-1"></div>
-          <div className="flex items-center gap-3 text-[10px] font-mono text-primary/80">
-            <span>{(state.streamingCode?.length || 0).toLocaleString()} CHARS</span>
-            <span className="opacity-50">|</span>
-            <span>~{Math.round((state.streamingCode?.length || 0) / 4).toLocaleString()} TOKENS</span>
-          </div>
-        </div>
-        <Icons.Code className="w-4 h-4 text-zinc-500" />
-      </div>
-      {/* Tech Cloud */}
-      <div className="px-3 py-2 border-b border-white/5 bg-black/20 flex items-center gap-2 overflow-x-auto">
-        {techTags.map((t, idx) => (
-          <span
-            key={t}
-            className={`shrink-0 px-2 py-0.5 rounded-full text-[10px] font-mono border transition-all duration-500 ${idx === activeTechIndex
-              ? 'text-primary border-primary/30 bg-primary/10 shadow-[0_0_16px_rgba(52,211,153,0.25)]'
-              : 'text-zinc-400 border-white/10 bg-white/5 opacity-80'}`}
-            style={{ animationDelay: `${idx * 120}ms` }}
-          >
-            {t}
-          </span>
-        ))}
-      </div>
-      <div className="flex-1 overflow-hidden relative flex flex-col">
-        {/* Checklist (Condensed) */}
-        <div className="p-4 border-b border-white/5 bg-black/20 flex flex-col gap-3 shrink-0">
-          {[
-            { label: "Initializing Build Environment", threshold: 0 },
-            { label: "Parsing Blueprint Architecture", threshold: 100 },
-            { label: "Scaffolding HTML Structure", threshold: 500 },
-            { label: "Applying Tailwind Utility Classes", threshold: 1500 },
-            { label: "Injecting JavaScript Logic", threshold: 3000 },
-            { label: "Finalizing & Optimizing Assets", threshold: 5000 }
-          ].map((step, idx) => {
-            const currentLen = state.streamingCode?.length || 0;
-            const isComplete = currentLen > step.threshold + 800;
-            const isCurrent = currentLen >= step.threshold && !isComplete;
-            const isPending = currentLen < step.threshold;
-
-            if (isPending) return null; // Only show active/done steps to save space
-
-            return (
-              <div key={idx} className={`flex items-center gap-3 transition-all duration-500 ${isCurrent ? 'scale-105 ml-2' : ''}`}>
-                <div className={`w-4 h-4 rounded-full flex items-center justify-center border transition-colors ${isComplete ? 'bg-primary border-primary text-black' :
-                  isCurrent ? 'border-primary text-primary animate-pulse' : 'border-zinc-700 bg-zinc-900'}`}>
-                  {isComplete ? <Icons.Check className="w-2.5 h-2.5" /> : isCurrent ? <div className="w-1.5 h-1.5 bg-primary rounded-full animate-ping" /> : <div className="w-1.5 h-1.5 bg-zinc-700 rounded-full" />}
-                </div>
-                <div className="flex flex-col">
-                  <span className={`text-[10px] font-bold ${isComplete ? 'text-zinc-500' : isCurrent ? 'text-white' : 'text-zinc-600'}`}>
-                    {step.label}
-                  </span>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-
-        {/* REAL CODE STREAM REMOVED -> REPLACED WITH AI THOUGHTS */}
-        <div className="flex-1 p-4 overflow-auto bg-[#050505] shadow-inner relative flex flex-col gap-2">
-          <div className="text-[9px] text-zinc-500 uppercase tracking-widest mb-1 flex items-center gap-2">
-            <Icons.MessageSquare className="w-3 h-3" />
-            Builder Notes
-          </div>
-
-          {(() => {
-            const code = state.streamingCode || "";
-            const thinkMatch = code.match(/<thinking>([\s\S]*?)(?:<\/thinking>|$)/i);
-            const thinking = thinkMatch ? thinkMatch[1].trim() : null;
-
-            if (thinking) {
-              return (
-                <div className="text-xs text-zinc-400 font-sans leading-relaxed whitespace-pre-wrap animate-in fade-in slide-in-from-bottom-2 duration-500">
-                  {thinking}
-                  {code.includes("</thinking>") && (
-                    <div className="mt-4 pt-4 border-t border-dashed border-zinc-800 text-[10px] text-emerald-500/50 flex items-center gap-2">
-                      <Icons.Check className="w-3 h-3" />
-                      Strategy locked. Generatng artifact bundle...
-                    </div>
-                  )}
-                </div>
-              );
-            } else {
-              return (
-                <div className="text-zinc-700 text-xs italic flex flex-col gap-2 items-center justify-center h-full opacity-50">
-                  <div className="w-1 h-1 bg-zinc-600 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
-                  <div className="w-1 h-1 bg-zinc-600 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
-                  <div className="w-1 h-1 bg-zinc-600 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
-                  <span>Waiting for builder notes...</span>
-                </div>
-              );
-            }
-          })()}
-        </div>
-      </div>
-    </div>
-
-    {/* CHAT CONTENT (SLIDES OUT) */}
-    <div className={`flex flex-col h-full transition-transform duration-500 ease-in-out ${showStreaming ? 'translate-x-full' : 'translate-x-0'}`}>
-      <div className="p-4 border-b border-white/5 font-medium text-xs flex items-center justify-between bg-white/5 backdrop-blur-xl rounded-t-2xl">
-        <div className="flex items-center gap-2">
-          <div className="w-1.5 h-1.5 rounded-full bg-primary shadow-[0_0_8px_rgba(52,211,153,0.8)] animate-pulse" />
-          <span className="text-zinc-200 font-display tracking-wide">AI ORCHESTRATOR</span>
-        </div>
-        <div className="flex items-center gap-2">
-          {state.globalMode === GlobalMode.Chat && (
-            <select
-              value={state.chatPersona}
-              onChange={(e) => dispatch({ type: 'SET_CHAT_PERSONA', persona: e.target.value as any })}
-              className="text-[10px] px-2 py-1 bg-black/30 rounded-lg text-zinc-200 border border-white/10 focus:outline-none focus:border-primary/40"
-              title="Chat persona"
-            >
-              <option value="assistant">Assistant</option>
-              <option value="office">Office Assistant</option>
-              <option value="therapist">Therapist</option>
-              <option value="business">Business Coach</option>
-              <option value="it">IT Advisor</option>
-              <option value="designer">Designer</option>
-              <option value="custom">{state.customChatPersonaName || 'Custom'}</option>
-            </select>
-          )}
-          {state.globalMode === GlobalMode.Chat && state.chatPersona === 'custom' && (
-            <button
-              onClick={() => setShowCustomPersona(true)}
-              className="text-[10px] px-2 py-1 bg-white/5 hover:bg-white/10 border border-white/10 rounded-lg text-zinc-200"
-              title="Edit custom persona"
-            >
-              Edit
-            </button>
-          )}
-          {state.globalMode === GlobalMode.Brainstorm && (
-            <span className="text-[10px] px-2 py-1 bg-blue-500/10 text-blue-200 border border-blue-500/20 rounded-lg">
-              Brainstorm
-            </span>
-          )}
-          <span className="text-[9px] px-1.5 py-0.5 bg-zinc-800 rounded text-zinc-500 uppercase tracking-wider border border-white/5">{state.state}</span>
-          <button
-            onClick={() => setShowAISettings(true)}
-            className="p-1.5 hover:bg-white/10 rounded-lg text-zinc-400 hover:text-white transition-colors"
-            title="AI Settings"
-          >
-            <Icons.Settings className="w-3.5 h-3.5" />
-          </button>
-          {state.chatDocked === 'bottom' && (
-            <button onClick={() => dispatch({ type: 'TOGGLE_CHAT_DOCK' })} className="hover:text-white text-zinc-500"><Icons.Layout className="w-3 h-3" /></button>
-          )}
-        </div>
-      </div>
-
-      {/* AI SETTINGS MODAL */}
-      {showAISettings && <AISettingsModal onClose={() => setShowAISettings(false)} />}
-
+      {/* STREAMING EDITOR OVERLAY (SLIDES IN) */}
       <div
-        ref={timelineScrollRef}
-        className="flex-1 overflow-y-auto p-4 space-y-6 scroll-smooth"
-        onScroll={(e) => {
-          const el = e.currentTarget;
-          setAutoScrollEnabled(isNearBottom(el));
-        }}
+        className={`absolute inset-0 bg-[#0B0B0C] z-30 flex flex-col transition-transform duration-500 ease-in-out ${showStreaming ? 'translate-x-0' : '-translate-x-full'}`}
       >
-        {state.timeline.filter(t => t.type === 'user' || t.type === 'system').map(log => (
-          <div key={log.id} className={`flex flex-col gap-1 ${log.type === 'user' ? 'items-end' : 'items-start'} animate-slide-up`}>
-            <div className={`max-w-[85%] rounded-2xl p-4 text-sm leading-relaxed shadow-lg backdrop-blur-sm ${log.type === 'user'
-              ? 'bg-zinc-800/80 text-white rounded-br-sm border border-white/10'
-              : 'bg-primary/5 text-zinc-100 rounded-bl-sm border border-primary/10 w-full'
-              }`}>
-              <LogMessage message={log.message} type={log.type as any} />
+        <div className="p-3 border-b border-white/10 bg-zinc-900 flex items-center justify-between shadow-md z-10">
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2">
+              <div className="relative">
+                <div className="w-2 h-2 rounded-full bg-primary animate-ping absolute inset-0 opacity-75"></div>
+                <div className="w-2 h-2 rounded-full bg-primary relative z-10"></div>
+              </div>
+              <span className="text-xs font-mono font-bold text-zinc-300 tracking-wider">FORGING<span className="text-zinc-600">_</span>SEQUENCE</span>
             </div>
-            <span className="text-[10px] text-zinc-600 px-1 opacity-50">{new Date(log.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
-          </div>
-        ))}
-
-        {/* IT Expert Action Proposal */}
-        {state.pendingProposal && (
-          <div className="animate-slide-up">
-            <ActionProposalCard proposal={state.pendingProposal} />
-          </div>
-        )}
-
-        {/* Templates / Suggestions when empty */}
-        {/* Empty State: Idea Seeds */}
-        {state.timeline.length === 0 && !isThinking && (
-          <div className="flex flex-col items-center justify-center p-2 animate-fade-in w-full">
-            <div className="w-full bg-white/5 border border-white/5 rounded-2xl p-6 mb-4 backdrop-blur-sm">
-              <div className="flex items-center gap-3 mb-4 text-zinc-300">
-                <div className="p-2 bg-primary/10 rounded-lg"><Icons.Sparkles className="w-5 h-5 text-primary" /></div>
-                <div>
-                  <h3 className="font-bold text-sm text-white">What shall we build?</h3>
-                  <p className="text-[10px] text-zinc-500">Generate tailored build ideas or start fresh.</p>
-                </div>
-              </div>
-              <div className="flex gap-2 mb-2">
-                <input
-                  className="flex-1 bg-black/40 border border-white/10 rounded-xl px-3 py-2 text-sm text-white focus:border-primary/50 outline-none transition-colors placeholder:text-zinc-600"
-                  placeholder="e.g. fitness tracker, retro game, portfolio..."
-                  value={ideaSeed}
-                  onChange={e => setIdeaSeed(e.target.value)}
-                  onKeyDown={e => e.key === 'Enter' && handleGenerateIdeas()}
-                />
-                <button
-                  disabled={ideaStatus === 'loading'}
-                  onClick={handleGenerateIdeas}
-                  className="bg-white text-black px-4 py-2 rounded-xl font-bold text-xs hover:bg-zinc-200 transition-colors disabled:opacity-50 flex items-center gap-2"
-                >
-                  {ideaStatus === 'loading' && <Icons.RefreshCw className="w-3 h-3 animate-spin" />}
-                  Generate
-                </button>
-              </div>
-              {ideaStatus === 'error' && <p className="text-[10px] text-rose-400 mt-2 flex items-center gap-1"><Icons.AlertTriangle className="w-3 h-3" /> Failed to generate ideas. Try fewer keywords.</p>}
+            {/* Real-time Metrics */}
+            <div className="h-4 w-px bg-white/10 mx-1"></div>
+            <div className="flex items-center gap-3 text-[10px] font-mono text-primary/80">
+              <span>{(state.streamingCode?.length || 0).toLocaleString()} CHARS</span>
+              <span className="opacity-50">|</span>
+              <span>~{Math.round((state.streamingCode?.length || 0) / 4).toLocaleString()} TOKENS</span>
             </div>
-
-            {/* Results Grid */}
-            {(ideaResults.length > 0 || ideaStatus === 'loading') && (
-              <div className="grid grid-cols-2 gap-3 w-full animate-fade-in-up">
-                {ideaStatus === 'loading'
-                  ? Array(6).fill(0).map((_, i) => (
-                    <div key={i} className="h-24 bg-white/5 rounded-xl animate-pulse border border-white/5" />
-                  ))
-                  : ideaResults.map((idea, i) => (
-                    <button
-                      key={i}
-                      onClick={() => handleSubmit(null as any, idea.prompt)}
-                      className="text-left p-3 bg-zinc-900/50 hover:bg-zinc-800 border border-white/5 hover:border-primary/40 rounded-xl group transition-all active:scale-95 flex flex-col h-24 relative overflow-hidden"
-                    >
-                      <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity -translate-x-2 group-hover:translate-x-0 duration-300">
-                        <Icons.ArrowRight className="w-3 h-3 text-primary" />
-                      </div>
-                      <span className="text-[9px] font-mono text-zinc-500 uppercase tracking-widest mb-1 border border-white/5 px-1.5 py-0.5 rounded self-start">{idea.tag || 'App'}</span>
-                      <h4 className="font-bold text-zinc-200 text-xs mb-1 line-clamp-1 group-hover:text-white transition-colors">{idea.title}</h4>
-                      <p className="text-[10px] text-zinc-500 leading-tight line-clamp-2 group-hover:text-zinc-400">{idea.subtitle}</p>
-                    </button>
-                  ))
-                }
-              </div>
-            )}
           </div>
-        )}
-
-        {isThinking && (
-          <div className="flex flex-col gap-2 items-start animate-slide-up">
-            <div className="max-w-[85%] rounded-2xl p-4 text-sm leading-relaxed shadow-lg backdrop-blur-sm bg-primary/5 text-zinc-100 rounded-bl-sm border border-primary/10 flex items-center gap-3">
-              <div className="flex gap-1">
-                <div className="w-1.5 h-1.5 bg-primary rounded-full animate-bounce"></div>
-                <div className="w-1.5 h-1.5 bg-primary rounded-full animate-bounce delay-75"></div>
-                <div className="w-1.5 h-1.5 bg-primary rounded-full animate-bounce delay-150"></div>
-              </div>
-              <div className="flex flex-col">
-                <span className="text-xs font-mono text-primary/80 animate-pulse">{thinkingLabel}</span>
-                {state.streamingCode && state.streamingCode.length > 0 && (
-                  <span className="text-[9px] font-mono text-primary/50 text-xs mt-0.5">
-                    {state.streamingCode.length} chars · ~{Math.ceil(state.streamingCode.length / 4)} tokens
-                  </span>
-                )}
-              </div>
-            </div>
-            <span className="text-[10px] text-zinc-500 px-1 opacity-70 flex items-center gap-2">
-              <Icons.RefreshCw className="w-3 h-3 animate-spin" />
-              Working...
-              {state.streamingCode && state.streamingCode.length > 0 && (
-                <span className="ml-2 font-mono text-primary/60">
-                  {state.streamingCode.length} chars | ~{Math.ceil(state.streamingCode.length / 4)} tokens
-                </span>
-              )}
-            </span>
-          </div>
-        )}
-
-        {!autoScrollEnabled && (
-          <div className="sticky bottom-2 flex justify-center">
-            <button
-              onClick={() => {
-                setAutoScrollEnabled(true);
-                const el = timelineScrollRef.current;
-                if (el) el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' });
-              }}
-              className="px-3 py-1.5 text-[10px] font-bold rounded-full bg-white/10 hover:bg-white/15 border border-white/10 text-zinc-200 backdrop-blur-md"
+          <Icons.Code className="w-4 h-4 text-zinc-500" />
+        </div>
+        {/* Tech Cloud */}
+        <div className="px-3 py-2 border-b border-white/5 bg-black/20 flex items-center gap-2 overflow-x-auto">
+          {techTags.map((t, idx) => (
+            <span
+              key={t}
+              className={`shrink-0 px-2 py-0.5 rounded-full text-[10px] font-mono border transition-all duration-500 ${idx === activeTechIndex
+                ? 'text-primary border-primary/30 bg-primary/10 shadow-[0_0_16px_rgba(52,211,153,0.25)]'
+                : 'text-zinc-400 border-white/10 bg-white/5 opacity-80'}`}
+              style={{ animationDelay: `${idx * 120}ms` }}
             >
-              Jump to latest
-            </button>
-          </div>
-        )}
-      </div>
+              {t}
+            </span>
+          ))}
+        </div>
+        <div className="flex-1 overflow-hidden relative flex flex-col">
+          {/* Checklist (Condensed) */}
+          <div className="p-4 border-b border-white/5 bg-black/20 flex flex-col gap-3 shrink-0">
+            {[
+              { label: "Initializing Build Environment", threshold: 0 },
+              { label: "Parsing Blueprint Architecture", threshold: 100 },
+              { label: "Scaffolding HTML Structure", threshold: 500 },
+              { label: "Applying Tailwind Utility Classes", threshold: 1500 },
+              { label: "Injecting JavaScript Logic", threshold: 3000 },
+              { label: "Finalizing & Optimizing Assets", threshold: 5000 }
+            ].map((step, idx) => {
+              const currentLen = state.streamingCode?.length || 0;
+              const isComplete = currentLen > step.threshold + 800;
+              const isCurrent = currentLen >= step.threshold && !isComplete;
+              const isPending = currentLen < step.threshold;
 
-      <form
-        onSubmit={handleSubmit}
-        className={`p-4 bg-gradient-to-t from-black/40 to-transparent rounded-b-2xl ${isDragging ? 'ring-2 ring-primary ring-offset-2 ring-offset-black' : ''}`}
-        onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
-        onDragLeave={(e) => {
-          if (e.relatedTarget && !e.currentTarget.contains(e.relatedTarget as Node)) {
-            setIsDragging(false);
-          }
-        }}
-        onDrop={handleFileDrop}
-      >
-        {/* Skill Recommendations */}
-        {recommendedSkills.length > 0 && (
-          <div className="flex flex-wrap gap-2 mb-2 px-1 animate-fade-in-up">
-            <span className="text-[10px] text-zinc-500 self-center uppercase tracking-wider">Suggested Tools:</span>
-            {recommendedSkills.map(skill => {
-              const IconComp = (Icons as any)[skill.icon] || Icons.Box;
+              if (isPending) return null; // Only show active/done steps to save space
+
               return (
-                <button
-                  key={skill.id}
-                  type="button"
-                  onClick={async () => {
-                    try {
-                      const { skillsService } = await import('../services/skillsService');
-                      await skillsService.installSkill(skill.id);
-                      setRecommendedSkills(prev => prev.filter(s => s.id !== skill.id));
-                    } catch (e) { console.error(e); }
-                  }}
-                  className="flex items-center gap-1.5 px-2.5 py-1 text-[10px] bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-300 border border-indigo-500/20 rounded-full transition-colors"
-                >
-                  <IconComp className="w-3 h-3" />
-                  <span>{skill.name}</span>
-                  <span className="opacity-50 text-[9px]">+</span>
-                </button>
+                <div key={idx} className={`flex items-center gap-3 transition-all duration-500 ${isCurrent ? 'scale-105 ml-2' : ''}`}>
+                  <div className={`w-4 h-4 rounded-full flex items-center justify-center border transition-colors ${isComplete ? 'bg-primary border-primary text-black' :
+                    isCurrent ? 'border-primary text-primary animate-pulse' : 'border-zinc-700 bg-zinc-900'}`}>
+                    {isComplete ? <Icons.Check className="w-2.5 h-2.5" /> : isCurrent ? <div className="w-1.5 h-1.5 bg-primary rounded-full animate-ping" /> : <div className="w-1.5 h-1.5 bg-zinc-700 rounded-full" />}
+                  </div>
+                  <div className="flex flex-col">
+                    <span className={`text-[10px] font-bold ${isComplete ? 'text-zinc-500' : isCurrent ? 'text-white' : 'text-zinc-600'}`}>
+                      {step.label}
+                    </span>
+                  </div>
+                </div>
               );
             })}
           </div>
-        )}
-        {/* Attachment chips */}
-        {attachments.length > 0 && (
-          <div className="flex flex-wrap gap-1.5 mb-2">
-            {attachments.map(att => (
-              <div key={att.id} className="flex items-center gap-1 px-2 py-1 bg-white/5 border border-white/10 rounded-lg text-[10px] text-zinc-300">
-                <span className={`w-1.5 h-1.5 rounded-full ${att.type === 'text' ? 'bg-blue-400' : att.type === 'image' ? 'bg-purple-400' : 'bg-green-400'}`} />
-                <span className="max-w-[100px] truncate">{att.name}</span>
-                <button type="button" onClick={() => removeAttachment(att.id)} className="text-zinc-500 hover:text-rose-400 ml-1">
-                  <Icons.X className="w-2.5 h-2.5" />
-                </button>
-              </div>
-            ))}
+
+          {/* REAL CODE STREAM REMOVED -> REPLACED WITH AI THOUGHTS */}
+          <div className="flex-1 p-4 overflow-auto bg-[#050505] shadow-inner relative flex flex-col gap-2">
+            <div className="text-[9px] text-zinc-500 uppercase tracking-widest mb-1 flex items-center gap-2">
+              <Icons.MessageSquare className="w-3 h-3" />
+              Builder Notes
+            </div>
+
+            {(() => {
+              const code = state.streamingCode || "";
+              const thinkMatch = code.match(/<thinking>([\s\S]*?)(?:<\/thinking>|$)/i);
+              const thinking = thinkMatch ? thinkMatch[1].trim() : null;
+
+              if (thinking) {
+                return (
+                  <div className="text-xs text-zinc-400 font-sans leading-relaxed whitespace-pre-wrap animate-in fade-in slide-in-from-bottom-2 duration-500">
+                    {thinking}
+                    {code.includes("</thinking>") && (
+                      <div className="mt-4 pt-4 border-t border-dashed border-zinc-800 text-[10px] text-emerald-500/50 flex items-center gap-2">
+                        <Icons.Check className="w-3 h-3" />
+                        Strategy locked. Generatng artifact bundle...
+                      </div>
+                    )}
+                  </div>
+                );
+              } else {
+                return (
+                  <div className="text-zinc-700 text-xs italic flex flex-col gap-2 items-center justify-center h-full opacity-50">
+                    <div className="w-1 h-1 bg-zinc-600 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+                    <div className="w-1 h-1 bg-zinc-600 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+                    <div className="w-1 h-1 bg-zinc-600 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+                    <span>Waiting for builder notes...</span>
+                  </div>
+                );
+              }
+            })()}
           </div>
-        )}
-        <div className="relative group">
-          <div className="absolute -inset-0.5 bg-gradient-to-r from-primary/20 to-blue-500/20 rounded-xl blur opacity-0 group-focus-within:opacity-100 transition duration-500"></div>
-          {/* Hidden file input */}
-          <input
-            type="file"
-            ref={fileInputRef}
-            onChange={handleFileSelect}
-            className="hidden"
-            multiple
-            accept=".txt,.md,.json,.js,.ts,.tsx,.html,.css,.py,.go,.rs,.java,.c,.cpp,.cs,.yml,.yaml,.toml,.ini,.log,.png,.jpg,.jpeg,.webp,.gif,.csv,.xlsx,.xls,.docx,.doc,.pptx,.ppt,.pdf"
-          />
-          {/* Main Input Field - Adjusted padding for right-aligned icons */}
-          <input
-            className="relative w-full bg-zinc-900/90 border border-white/10 rounded-xl pl-4 pr-48 py-3.5 text-sm text-white placeholder-zinc-600 focus:outline-none transition-all shadow-inner"
-            placeholder={isDragging ? "Drop files here..." : "Direct the orchestrator..."}
-            value={input}
-            disabled={isThinking}
-            onChange={e => setInput(e.target.value)}
-            autoFocus
-          />
+        </div>
+      </div>
 
-          {/* Right-aligned Action Buttons */}
-          <div className="absolute right-2 top-2 flex items-center gap-1">
-            {/* Paperclip button */}
-            <button
-              type="button"
-              onClick={() => fileInputRef.current?.click()}
-              className="p-1.5 text-zinc-500 hover:text-primary rounded-lg transition-colors"
-              title="Attach files"
-            >
-              <Icons.Paperclip className="w-4 h-4" />
-            </button>
-
-            {/* Tools Button / Skills */}
-            <button
-              type="button"
-              onClick={() => setShowSkillsSelector(true)}
-              className="p-1.5 text-zinc-500 hover:text-purple-400 rounded-lg transition-colors"
-              title="Discover & Use Skills"
-            >
-              <Icons.Terminal className="w-4 h-4" />
-            </button>
-
-            {/* Persona Quick Access */}
-            <button
-              type="button"
-              onClick={() => setShowCustomPersona(true)}
-              className="p-1.5 text-zinc-500 hover:text-indigo-400 rounded-lg transition-colors"
-              title="Select Agent / Persona"
-            >
-              <Icons.User className="w-4 h-4" />
-            </button>
-
-            {/* Zap / Shortcuts (Also Skills for now, could be quick actions) */}
-            <button
-              type="button"
-              onClick={() => setShowSkillsSelector(true)}
-              className="p-1.5 text-zinc-500 hover:text-cyan-400 rounded-lg transition-colors"
-              title="Generate New Skill"
-            >
-              <Icons.Zap className="w-4 h-4" />
-            </button>
-
-            <div className="w-px h-5 bg-white/10 mx-1"></div> {/* Divider */}
-            {/* Edit & Resend button (shows after cancel or error) */}
-            {(state.activeRequestStatus === 'cancelled' || state.activeRequestStatus === 'error') && state.lastUserMessageDraft && !isThinking && (
-              <button
-                type="button"
-                onClick={() => {
-                  setInput(state.lastUserMessageDraft || '');
-                  dispatch({ type: 'EDIT_AND_RESEND' });
-                }}
-                className="px-2 py-1.5 bg-blue-500/20 hover:bg-blue-500/30 text-blue-400 rounded-lg text-[10px] font-bold transition-all"
-                title="Edit & Resend last message"
+      {/* CHAT CONTENT (SLIDES OUT) */}
+      <div className={`flex flex-col h-full transition-transform duration-500 ease-in-out ${showStreaming ? 'translate-x-full' : 'translate-x-0'}`}>
+        <div className="p-4 border-b border-white/5 font-medium text-xs flex items-center justify-between bg-white/5 backdrop-blur-xl rounded-t-2xl">
+          <div className="flex items-center gap-2">
+            <div className="w-1.5 h-1.5 rounded-full bg-primary shadow-[0_0_8px_rgba(52,211,153,0.8)] animate-pulse" />
+            <span className="text-zinc-200 font-display tracking-wide">AI ORCHESTRATOR</span>
+          </div>
+          <div className="flex items-center gap-2">
+            {state.globalMode === GlobalMode.Chat && (
+              <select
+                value={state.chatPersona}
+                onChange={(e) => dispatch({ type: 'SET_CHAT_PERSONA', persona: e.target.value as any })}
+                className="text-[10px] px-2 py-1 bg-black/30 rounded-lg text-zinc-200 border border-white/10 focus:outline-none focus:border-primary/40"
+                title="Chat persona"
               >
-                Edit & Resend
+                <option value="assistant">Assistant</option>
+                <option value="office">Office Assistant</option>
+                <option value="therapist">Therapist</option>
+                <option value="business">Business Coach</option>
+                <option value="it">IT Advisor</option>
+                <option value="designer">Designer</option>
+                <option value="custom">{state.customChatPersonaName || 'Custom'}</option>
+              </select>
+            )}
+            {state.globalMode === GlobalMode.Chat && state.chatPersona === 'custom' && (
+              <button
+                onClick={() => setShowCustomPersona(true)}
+                className="text-[10px] px-2 py-1 bg-white/5 hover:bg-white/10 border border-white/10 rounded-lg text-zinc-200"
+                title="Edit custom persona"
+              >
+                Edit
               </button>
             )}
-            {/* Stop button (shows when thinking) */}
-            {isThinking ? (
-              <button
-                type="button"
-                onClick={() => {
-                  dispatch({ type: 'CANCEL_REQUEST' });
-                  if ((window as any).electron) {
-                    (window as any).electron.removeChatListeners();
-                  }
-                  setIsThinking(false);
-                  setThinkingLabel('Thinking...');
-                }}
-                className="p-1.5 bg-rose-500/20 hover:bg-rose-500/30 text-rose-400 rounded-lg transition-all"
-                title="Stop generation"
-              >
-                <Icons.X className="w-3.5 h-3.5" />
-              </button>
-            ) : (
-              <button type="submit" disabled={isThinking} className="p-1.5 bg-white/10 hover:bg-primary hover:text-black rounded-lg text-zinc-400 transition-all duration-300 disabled:opacity-50">
-                <Icons.ArrowRight className="w-3.5 h-3.5" />
-              </button>
+            {state.globalMode === GlobalMode.Brainstorm && (
+              <span className="text-[10px] px-2 py-1 bg-blue-500/10 text-blue-200 border border-blue-500/20 rounded-lg">
+                Brainstorm
+              </span>
+            )}
+            <span className="text-[9px] px-1.5 py-0.5 bg-zinc-800 rounded text-zinc-500 uppercase tracking-wider border border-white/5">{state.state}</span>
+            <button
+              onClick={() => setShowAISettings(true)}
+              className="p-1.5 hover:bg-white/10 rounded-lg text-zinc-400 hover:text-white transition-colors"
+              title="AI Settings"
+            >
+              <Icons.Settings className="w-3.5 h-3.5" />
+            </button>
+            {state.chatDocked === 'bottom' && (
+              <button onClick={() => dispatch({ type: 'TOGGLE_CHAT_DOCK' })} className="hover:text-white text-zinc-500"><Icons.Layout className="w-3 h-3" /></button>
             )}
           </div>
         </div>
-        {/* Modification mode indicator */}
-        {(state.state === OrchestratorState.PreviewReady || state.state === OrchestratorState.Editing) && state.files['index.html'] && (
-          <div className="mt-2 flex items-center gap-2">
-            <span className="text-[9px] px-2 py-0.5 bg-amber-500/10 text-amber-400 border border-amber-500/20 rounded-full font-mono uppercase tracking-wider">
-              Modify Existing App
-            </span>
-            <span className="text-[9px] text-zinc-500">Changes will preserve your current design</span>
+
+        {/* AI SETTINGS MODAL */}
+        {showAISettings && <AISettingsModal onClose={() => setShowAISettings(false)} />}
+
+        <div
+          ref={timelineScrollRef}
+          className="flex-1 overflow-y-auto p-4 space-y-6 scroll-smooth"
+          onScroll={(e) => {
+            const el = e.currentTarget;
+            setAutoScrollEnabled(isNearBottom(el));
+          }}
+        >
+          {state.timeline.filter(t => t.type === 'user' || t.type === 'system').map(log => (
+            <div key={log.id} className={`flex flex-col gap-1 ${log.type === 'user' ? 'items-end' : 'items-start'} animate-slide-up`}>
+              <div className={`max-w-[85%] rounded-2xl p-4 text-sm leading-relaxed shadow-lg backdrop-blur-sm ${log.type === 'user'
+                ? 'bg-zinc-800/80 text-white rounded-br-sm border border-white/10'
+                : 'bg-primary/5 text-zinc-100 rounded-bl-sm border border-primary/10 w-full'
+                }`}>
+                <LogMessage message={log.message} type={log.type as any} />
+              </div>
+              <span className="text-[10px] text-zinc-600 px-1 opacity-50">{new Date(log.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+            </div>
+          ))}
+
+          {/* IT Expert Action Proposal */}
+          {state.pendingProposal && (
+            <div className="animate-slide-up">
+              <ActionProposalCard proposal={state.pendingProposal} />
+            </div>
+          )}
+
+          {/* Templates / Suggestions when empty */}
+          {/* Empty State: Idea Seeds */}
+          {state.timeline.length === 0 && !isThinking && (
+            <div className="flex flex-col items-center justify-center p-2 animate-fade-in w-full">
+              <div className="w-full bg-white/5 border border-white/5 rounded-2xl p-6 mb-4 backdrop-blur-sm">
+                <div className="flex items-center gap-3 mb-4 text-zinc-300">
+                  <div className="p-2 bg-primary/10 rounded-lg"><Icons.Sparkles className="w-5 h-5 text-primary" /></div>
+                  <div>
+                    <h3 className="font-bold text-sm text-white">What shall we build?</h3>
+                    <p className="text-[10px] text-zinc-500">Generate tailored build ideas or start fresh.</p>
+                  </div>
+                </div>
+                <div className="flex gap-2 mb-2">
+                  <input
+                    className="flex-1 bg-black/40 border border-white/10 rounded-xl px-3 py-2 text-sm text-white focus:border-primary/50 outline-none transition-colors placeholder:text-zinc-600"
+                    placeholder="e.g. fitness tracker, retro game, portfolio..."
+                    value={ideaSeed}
+                    onChange={e => setIdeaSeed(e.target.value)}
+                    onKeyDown={e => e.key === 'Enter' && handleGenerateIdeas()}
+                  />
+                  <button
+                    disabled={ideaStatus === 'loading'}
+                    onClick={handleGenerateIdeas}
+                    className="bg-white text-black px-4 py-2 rounded-xl font-bold text-xs hover:bg-zinc-200 transition-colors disabled:opacity-50 flex items-center gap-2"
+                  >
+                    {ideaStatus === 'loading' && <Icons.RefreshCw className="w-3 h-3 animate-spin" />}
+                    Generate
+                  </button>
+                </div>
+                {ideaStatus === 'error' && <p className="text-[10px] text-rose-400 mt-2 flex items-center gap-1"><Icons.AlertTriangle className="w-3 h-3" /> Failed to generate ideas. Try fewer keywords.</p>}
+              </div>
+
+              {/* Results Grid */}
+              {(ideaResults.length > 0 || ideaStatus === 'loading') && (
+                <div className="grid grid-cols-2 gap-3 w-full animate-fade-in-up">
+                  {ideaStatus === 'loading'
+                    ? Array(6).fill(0).map((_, i) => (
+                      <div key={i} className="h-24 bg-white/5 rounded-xl animate-pulse border border-white/5" />
+                    ))
+                    : ideaResults.map((idea, i) => (
+                      <button
+                        key={i}
+                        onClick={() => handleSubmit(null as any, idea.prompt)}
+                        className="text-left p-3 bg-zinc-900/50 hover:bg-zinc-800 border border-white/5 hover:border-primary/40 rounded-xl group transition-all active:scale-95 flex flex-col h-24 relative overflow-hidden"
+                      >
+                        <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity -translate-x-2 group-hover:translate-x-0 duration-300">
+                          <Icons.ArrowRight className="w-3 h-3 text-primary" />
+                        </div>
+                        <span className="text-[9px] font-mono text-zinc-500 uppercase tracking-widest mb-1 border border-white/5 px-1.5 py-0.5 rounded self-start">{idea.tag || 'App'}</span>
+                        <h4 className="font-bold text-zinc-200 text-xs mb-1 line-clamp-1 group-hover:text-white transition-colors">{idea.title}</h4>
+                        <p className="text-[10px] text-zinc-500 leading-tight line-clamp-2 group-hover:text-zinc-400">{idea.subtitle}</p>
+                      </button>
+                    ))
+                  }
+                </div>
+              )}
+            </div>
+          )}
+
+          {isThinking && (
+            <div className="flex flex-col gap-2 items-start animate-slide-up">
+              <div className="max-w-[85%] rounded-2xl p-4 text-sm leading-relaxed shadow-lg backdrop-blur-sm bg-primary/5 text-zinc-100 rounded-bl-sm border border-primary/10 flex items-center gap-3">
+                <div className="flex gap-1">
+                  <div className="w-1.5 h-1.5 bg-primary rounded-full animate-bounce"></div>
+                  <div className="w-1.5 h-1.5 bg-primary rounded-full animate-bounce delay-75"></div>
+                  <div className="w-1.5 h-1.5 bg-primary rounded-full animate-bounce delay-150"></div>
+                </div>
+                <div className="flex flex-col">
+                  <span className="text-xs font-mono text-primary/80 animate-pulse">{thinkingLabel}</span>
+                  {state.streamingCode && state.streamingCode.length > 0 && (
+                    <span className="text-[9px] font-mono text-primary/50 text-xs mt-0.5">
+                      {state.streamingCode.length} chars · ~{Math.ceil(state.streamingCode.length / 4)} tokens
+                    </span>
+                  )}
+                </div>
+              </div>
+              <span className="text-[10px] text-zinc-500 px-1 opacity-70 flex items-center gap-2">
+                <Icons.RefreshCw className="w-3 h-3 animate-spin" />
+                Working...
+                {state.streamingCode && state.streamingCode.length > 0 && (
+                  <span className="ml-2 font-mono text-primary/60">
+                    {state.streamingCode.length} chars | ~{Math.ceil(state.streamingCode.length / 4)} tokens
+                  </span>
+                )}
+              </span>
+            </div>
+          )}
+
+          {!autoScrollEnabled && (
+            <div className="sticky bottom-2 flex justify-center">
+              <button
+                onClick={() => {
+                  setAutoScrollEnabled(true);
+                  const el = timelineScrollRef.current;
+                  if (el) el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' });
+                }}
+                className="px-3 py-1.5 text-[10px] font-bold rounded-full bg-white/10 hover:bg-white/15 border border-white/10 text-zinc-200 backdrop-blur-md"
+              >
+                Jump to latest
+              </button>
+            </div>
+          )}
+        </div>
+
+        <form
+          onSubmit={handleSubmit}
+          className={`p-4 bg-gradient-to-t from-black/40 to-transparent rounded-b-2xl ${isDragging ? 'ring-2 ring-primary ring-offset-2 ring-offset-black' : ''}`}
+          onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
+          onDragLeave={(e) => {
+            if (e.relatedTarget && !e.currentTarget.contains(e.relatedTarget as Node)) {
+              setIsDragging(false);
+            }
+          }}
+          onDrop={handleFileDrop}
+        >
+          {/* Skill Recommendations */}
+          {recommendedSkills.length > 0 && (
+            <div className="flex flex-wrap gap-2 mb-2 px-1 animate-fade-in-up">
+              <span className="text-[10px] text-zinc-500 self-center uppercase tracking-wider">Suggested Tools:</span>
+              {recommendedSkills.map(skill => {
+                const IconComp = (Icons as any)[skill.icon] || Icons.Box;
+                return (
+                  <button
+                    key={skill.id}
+                    type="button"
+                    onClick={async () => {
+                      try {
+                        const { skillsService } = await import('../services/skillsService');
+                        await skillsService.installSkill(skill.id);
+                        setRecommendedSkills(prev => prev.filter(s => s.id !== skill.id));
+                      } catch (e) { console.error(e); }
+                    }}
+                    className="flex items-center gap-1.5 px-2.5 py-1 text-[10px] bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-300 border border-indigo-500/20 rounded-full transition-colors"
+                  >
+                    <IconComp className="w-3 h-3" />
+                    <span>{skill.name}</span>
+                    <span className="opacity-50 text-[9px]">+</span>
+                  </button>
+                );
+              })}
+            </div>
+          )}
+          {/* Attachment chips */}
+          {attachments.length > 0 && (
+            <div className="flex flex-wrap gap-1.5 mb-2">
+              {attachments.map(att => (
+                <div key={att.id} className="flex items-center gap-1 px-2 py-1 bg-white/5 border border-white/10 rounded-lg text-[10px] text-zinc-300">
+                  <span className={`w-1.5 h-1.5 rounded-full ${att.type === 'text' ? 'bg-blue-400' : att.type === 'image' ? 'bg-purple-400' : 'bg-green-400'}`} />
+                  <span className="max-w-[100px] truncate">{att.name}</span>
+                  <button type="button" onClick={() => removeAttachment(att.id)} className="text-zinc-500 hover:text-rose-400 ml-1">
+                    <Icons.X className="w-2.5 h-2.5" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+          <div className="relative group">
+            <div className="absolute -inset-0.5 bg-gradient-to-r from-primary/20 to-blue-500/20 rounded-xl blur opacity-0 group-focus-within:opacity-100 transition duration-500"></div>
+            {/* Hidden file input */}
+            <input
+              type="file"
+              ref={fileInputRef}
+              onChange={handleFileSelect}
+              className="hidden"
+              multiple
+              accept=".txt,.md,.json,.js,.ts,.tsx,.html,.css,.py,.go,.rs,.java,.c,.cpp,.cs,.yml,.yaml,.toml,.ini,.log,.png,.jpg,.jpeg,.webp,.gif,.csv,.xlsx,.xls,.docx,.doc,.pptx,.ppt,.pdf"
+            />
+            {/* Main Input Field - Adjusted padding for right-aligned icons */}
+            <input
+              className="relative w-full bg-zinc-900/90 border border-white/10 rounded-xl pl-4 pr-48 py-3.5 text-sm text-white placeholder-zinc-600 focus:outline-none transition-all shadow-inner"
+              placeholder={isDragging ? "Drop files here..." : "Direct the orchestrator..."}
+              value={input}
+              disabled={isThinking}
+              onChange={e => setInput(e.target.value)}
+              autoFocus
+            />
+
+            {/* Right-aligned Action Buttons */}
+            <div className="absolute right-2 top-2 flex items-center gap-1">
+              {/* Paperclip button */}
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                className="p-1.5 text-zinc-500 hover:text-primary rounded-lg transition-colors"
+                title="Attach files"
+              >
+                <Icons.Paperclip className="w-4 h-4" />
+              </button>
+
+              {/* Tools Button / Skills */}
+              <button
+                type="button"
+                onClick={() => setShowSkillsSelector(true)}
+                className="p-1.5 text-zinc-500 hover:text-purple-400 rounded-lg transition-colors"
+                title="Discover & Use Skills"
+              >
+                <Icons.Terminal className="w-4 h-4" />
+              </button>
+
+              {/* Persona Quick Access */}
+              <button
+                type="button"
+                onClick={() => setShowCustomPersona(true)}
+                className="p-1.5 text-zinc-500 hover:text-indigo-400 rounded-lg transition-colors"
+                title="Select Agent / Persona"
+              >
+                <Icons.User className="w-4 h-4" />
+              </button>
+
+              {/* Zap / Shortcuts (Also Skills for now, could be quick actions) */}
+              <button
+                type="button"
+                onClick={() => setShowSkillsSelector(true)}
+                className="p-1.5 text-zinc-500 hover:text-cyan-400 rounded-lg transition-colors"
+                title="Generate New Skill"
+              >
+                <Icons.Zap className="w-4 h-4" />
+              </button>
+
+              <div className="w-px h-5 bg-white/10 mx-1"></div> {/* Divider */}
+              {/* Edit & Resend button (shows after cancel or error) */}
+              {(state.activeRequestStatus === 'cancelled' || state.activeRequestStatus === 'error') && state.lastUserMessageDraft && !isThinking && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setInput(state.lastUserMessageDraft || '');
+                    dispatch({ type: 'EDIT_AND_RESEND' });
+                  }}
+                  className="px-2 py-1.5 bg-blue-500/20 hover:bg-blue-500/30 text-blue-400 rounded-lg text-[10px] font-bold transition-all"
+                  title="Edit & Resend last message"
+                >
+                  Edit & Resend
+                </button>
+              )}
+              {/* Stop button (shows when thinking) */}
+              {isThinking ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    dispatch({ type: 'CANCEL_REQUEST' });
+                    if ((window as any).electron) {
+                      (window as any).electron.removeChatListeners();
+                    }
+                    setIsThinking(false);
+                    setThinkingLabel('Thinking...');
+                  }}
+                  className="p-1.5 bg-rose-500/20 hover:bg-rose-500/30 text-rose-400 rounded-lg transition-all"
+                  title="Stop generation"
+                >
+                  <Icons.X className="w-3.5 h-3.5" />
+                </button>
+              ) : (
+                <button type="submit" disabled={isThinking} className="p-1.5 bg-white/10 hover:bg-primary hover:text-black rounded-lg text-zinc-400 transition-all duration-300 disabled:opacity-50">
+                  <Icons.ArrowRight className="w-3.5 h-3.5" />
+                </button>
+              )}
+            </div>
           </div>
-        )}
-      </form>
+          {/* Modification mode indicator */}
+          {(state.state === OrchestratorState.PreviewReady || state.state === OrchestratorState.Editing) && state.files['index.html'] && (
+            <div className="mt-2 flex items-center gap-2">
+              <span className="text-[9px] px-2 py-0.5 bg-amber-500/10 text-amber-400 border border-amber-500/20 rounded-full font-mono uppercase tracking-wider">
+                Modify Existing App
+              </span>
+              <span className="text-[9px] text-zinc-500">Changes will preserve your current design</span>
+            </div>
+          )}
+        </form>
+      </div>
+      {showCustomPersona && <PersonaSelectorModal onClose={() => setShowCustomPersona(false)} />}
+      {showSkillsSelector && <SkillsSelectorModal onClose={() => setShowSkillsSelector(false)} onSelect={(cmd) => setInput(prev => prev + ' ' + cmd)} />}
+      {state.personaCreateModalOpen && <PersonaCreateModal state={state} dispatch={dispatch} />}
     </div>
-    {showCustomPersona && <PersonaSelectorModal onClose={() => setShowCustomPersona(false)} />}
-    {showSkillsSelector && <SkillsSelectorModal onClose={() => setShowSkillsSelector(false)} onSelect={(cmd) => setInput(prev => prev + ' ' + cmd)} />}
-    {state.personaCreateModalOpen && <PersonaCreateModal state={state} dispatch={dispatch} />}
-  </div>
-);
+  );
 };
 
 const LogMessage = ({ message, type }: { message: string, type: 'user' | 'system' | 'error' }) => {
