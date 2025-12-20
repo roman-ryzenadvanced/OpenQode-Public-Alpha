@@ -24,34 +24,11 @@ export const setActiveModel = (model: string): void => {
 };
 
 export const CANVAS_ISOLATION_ARCHITECTURE = `
-# CANVAS ISOLATION ARCHITECTURE
-
-## 1. LAYERED CANVAS SYSTEM
-- **Base Canvas**: The complete, immutable original codebase
-- **Change Canvas**: Isolated layer containing ONLY the requested modifications
-- **Merge Canvas**: The precise intersection where changes are applied
-- **Validation Canvas**: Verification layer ensuring no unintended modifications
-
-## 2. SURGICAL CHANGE EXECUTION ENGINE
-
-**Phase 1: Boundary Mapping**
-- Parse user request with extreme precision. Create coordinates of exact change locations.
-- Establish quarantine zones around unrelated code.
-
-**Phase 2: Isolation Chamber**
-- Extract ONLY the specific code sections that need modification.
-- Maintain isolation. Apply atomic operations that cannot affect surrounding code.
-
-**Phase 3: Contextual Merge**
-- Merge changes back using surgical precision (Surgical Extraction -> Controlled Merge).
-- Verify zero impact on unrelated code.
-
-## 3. TECHNICAL ENFORCEMENT
-- **Code Fencing**: Mark sections as Isolation Chambers.
-- **Atomic Constraints**: No cascading modifications beyond immediate scope.
-- **Preservation Rate**: 100% of unrelated code must remain unchanged.
-
-Your expertise is measured by your ability to make surgical changes while preserving 100% of the user's existing work.
+### CANVAS ISOLATION ARCHITECTURE
+1. **Base Canvas**: Existing code is immutable. Avoid touching unrelated blocks.
+2. **Isolation Chamber**: Extract ONLY specific sections mentioned.
+3. **Precision Merge**: Merge back using surgical anchors. 100% preservation.
+4. **Boundary Mapping**: Identify exact coordinates. No cascading changes.
 `;
 
 // --- GEMINI 3 PRO / VIBE CODING TEMPLATE ---
@@ -60,58 +37,58 @@ You are an expert Frontend Engineer.
 Your task is to implement the User's Plan into a SINGLE, HIGH-FIDELITY HTML FILE using the REQUESTED FRAMEWORK.
 
 ### TECHNICAL REQUIREMENTS:
-1. **Single File**: Everything (HTML, CSS, JS) must be in one file.
-2. **CDNs Only**: Use reputable CDNs (cdnjs, unpkg, esm.sh) for libraries.
-3. **React**: If React is requested, use React 18 + ReactDOM 18 + Babel Standalone (for JSX).
-   - <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
-   - <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
-   - <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-   - <script type="text/babel"> ... your code ... </script>
-4. **Vue**: If Vue is requested, use Vue 3 global build.
-   - <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
-5. **Aesthetics**: Unless the user specified a specific CSS framework (like Bootstrap), DEFAULT to **TailwindCSS** for styling to maintain "Vibe" quality.
-   - <script src="https://cdn.tailwindcss.com"></script>
+1. ** Single File **: Everything(HTML, CSS, JS) must be in one file.
+2. ** CDNs Only **: Use reputable CDNs(cdnjs, unpkg, esm.sh) for libraries.
+3. ** React **: If React is requested, use React 18 + ReactDOM 18 + Babel Standalone(for JSX).
+   - <script src="https://unpkg.com/react@18/umd/react.development.js" > </script>
+  - <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" > </script>
+    - <script src="https://unpkg.com/@babel/standalone/babel.min.js" > </script>
+      - <script type="text/babel" > ... your code ... </script>
+4. ** Vue **: If Vue is requested, use Vue 3 global build.
+   - <script src="https://unpkg.com/vue@3/dist/vue.global.js" > </script>
+5. ** Aesthetics **: Unless the user specified a specific CSS framework(like Bootstrap), DEFAULT to ** TailwindCSS ** for styling to maintain "Vibe" quality.
+   - <script src="https://cdn.tailwindcss.com" > </script>
 
-### CRITICAL: CLIENT-SIDE ONLY
-- **NO SERVER-SIDE TEMPLATES**: DO NOT use Jinja2, Liquid, PHP, etc.
-- **NO NODE.JS SPECIFIC**: No 'require', no 'process.env', no 'npm install'.
-- **Mock Data**: Create dummy data arrays inside the script.
+### CRITICAL: CLIENT - SIDE ONLY
+  - ** NO SERVER - SIDE TEMPLATES **: DO NOT use Jinja2, Liquid, PHP, etc.
+- ** NO NODE.JS SPECIFIC **: No 'require', no 'process.env', no 'npm install'.
+- ** Mock Data **: Create dummy data arrays inside the script.
 
 ### OUTPUT FORMAT:
-- RETURN **ONLY** THE RAW HTML CODE.
+- RETURN ** ONLY ** THE RAW HTML CODE.
 - DO NOT USE MARKDOWN BLOCK.
-- DO NOT include or display the plan/instructions in the UI. The plan is input-only.
+- DO NOT include or display the plan / instructions in the UI.The plan is input - only.
 `;
 
 export const MODERN_TEMPLATE_PROMPT = `
 You are an elite Frontend Architect simulating the reasoning and coding quality of Google Gemini 1.5 Pro.
 
-### DESIGN & TECH STACK (NON-NEGOTIABLE)
-1. **Framework**: Vanilla HTML5 + JavaScript (ES6+). NO React/Vue/Angular unless explicitly requested.
-2. **Styling**: Tailwind CSS (via CDN). Use modern utility classes (flex, grid, glassmorphism, gradients). Use slate/zinc/neutral for structural greys and vibrant indigo/violet/blue for accents.
-3. **Icons**: FontAwesome (via CDN).
-4. **Font**: 'Inter' or 'JetBrains Mono' via Google Fonts.
+### DESIGN & TECH STACK(NON - NEGOTIABLE)
+1. ** Framework **: Vanilla HTML5 + JavaScript(ES6 +).NO React / Vue / Angular unless explicitly requested.
+2. ** Styling **: Tailwind CSS(via CDN).Use modern utility classes(flex, grid, glassmorphism, gradients).Use slate / zinc / neutral for structural greys and vibrant indigo / violet / blue for accents.
+3. ** Icons **: FontAwesome(via CDN).
+4. ** Font **: 'Inter' or 'JetBrains Mono' via Google Fonts.
 
 ### ATOMIC OUTPUT PROTOCOL
 1. You are strictly forbidden from 'chatting' your code. 
 2. You must output the code inside a standard XML block: <artifact_payload>.
-3. Do not output internal tool logs (like <<goose) inside this block.
+3. Do not output internal tool logs(like << goose) inside this block.
 
 Example Output:
-<artifact_payload file="index.html">
-<!DOCTYPE html>
-<html lang="en">
+<artifact_payload file="index.html" >
+  <!DOCTYPE html >
+  <html lang="en" >
 ...
 </html>
-</artifact_payload>
-`;
+  </artifact_payload>
+    `;
 
 
 
 export const MockComputerDriver: GooseUltraComputerDriver = {
   checkArmed: () => true, // In real app, check env var or system flag
   runAction: async (action, params) => {
-    console.log(`[Desktop] ${action}`, params);
+    console.log(`[Desktop] ${action} `, params);
     await sleep(800);
     return { status: 'success', screenshot: 'https://picsum.photos/800/600' };
   }
@@ -119,11 +96,11 @@ export const MockComputerDriver: GooseUltraComputerDriver = {
 
 export const MockBrowserDriver: GooseUltraBrowserDriver = {
   navigate: async (url) => {
-    console.log(`[Browser] Navigate: ${url}`);
+    console.log(`[Browser] Navigate: ${url} `);
     await sleep(1000);
   },
   assert: async (selector) => {
-    console.log(`[Browser] Assert: ${selector}`);
+    console.log(`[Browser] Assert: ${selector} `);
     await sleep(500);
     return true; // Always pass in mock
   }
@@ -136,8 +113,8 @@ export const MockServerDriver: GooseUltraServerDriver = {
     return true;
   },
   runCommand: async (cmd, dryRun) => {
-    if (dryRun) return `[DryRun] Would execute: ${cmd}`;
-    console.log(`[Server] Executing: ${cmd}`);
+    if (dryRun) return `[DryRun] Would execute: ${cmd} `;
+    console.log(`[Server] Executing: ${cmd} `);
     await sleep(1000);
     return `Success: ${cmd} executed.\nLogs: [System OK]`;
   }
@@ -165,22 +142,22 @@ Proposed Plan: "${plan.substring(0, 500)}..."
 Analyze if the Plan matches the User Request category.
 - If User asked for a Game and Plan is a Dashboard -> FAIL.
 - If User asked for a Portfolio and Plan is a Chatbot -> FAIL.
-- If they vaguely match (e.g., "App" and "Dashboard"), PASS.
+- If they vaguely match(e.g., "App" and "Dashboard"), PASS.
 
 OUTPUT ONLY JSON:
 {
   "matchesRequest": boolean,
-  "why": "string reason",
-  "detectedAppType": "string",
-  "requestType": "string"
-}`;
+    "why": "string reason",
+      "detectedAppType": "string",
+        "requestType": "string"
+} `;
 
   return new Promise((resolve) => {
     let buf = '';
     const onChunk = (c: string) => buf += c;
     const onComplete = (c: string) => {
       electron.removeChatListeners();
-      const final = (c && c.length > buf.length ? c : buf).replace(/```json/g, '').replace(/```/g, '').trim();
+      const final = (c && c.length > buf.length ? c : buf).replace(/```json/gi, '').replace(/```/g, '').trim();
       try {
         const res = JSON.parse(final);
         resolve(res);
@@ -725,15 +702,30 @@ If the request requires a FULL REDESIGN (changing >50% of layout or colors), set
 
   return new Promise((resolve, reject) => {
     let fullResponse = '';
+    const timeout = setTimeout(() => {
+      cleanup();
+      reject(new Error("Patch Generation Timeout (90s). The model took too long to respond."));
+    }, 90000);
 
     const onChunkHandler = (c: string) => {
       fullResponse += c;
-      if (onChunk) onChunk(JSON.stringify({ status: "Generating Patch...", size: fullResponse.length }));
+      // Throttled status updates
+      if (onChunk && fullResponse.length % 50 === 0) {
+        onChunk(JSON.stringify({ status: "Generating Patch...", size: fullResponse.length }));
+      }
     };
 
     const onCompleteHandler = async (c: string) => {
+      clearTimeout(timeout);
       cleanup();
-      const rawJson = (c.length > fullResponse.length ? c : fullResponse).trim();
+      let rawJson = (c.length > fullResponse.length ? c : fullResponse).trim();
+
+      // Robust extraction: find first { and last }
+      const firstBrace = rawJson.indexOf('{');
+      const lastBrace = rawJson.lastIndexOf('}');
+      if (firstBrace !== -1 && lastBrace > firstBrace) {
+        rawJson = rawJson.substring(firstBrace, lastBrace + 1);
+      }
 
       // Parse JSON
       let patchPlan: PatchPlan | null = null;
@@ -741,13 +733,11 @@ If the request requires a FULL REDESIGN (changing >50% of layout or colors), set
         const jsonStr = rawJson.replace(/```json/gi, '').replace(/```/g, '').trim();
         patchPlan = JSON.parse(jsonStr);
       } catch (e) {
-        console.error("Failed to parse patch JSON", e);
-        // Retry or Fail?
+        console.error("Failed to parse patch JSON", e, rawJson.substring(0, 300));
         if (retryCount < 1) {
-          console.log("Retrying patch generation...");
           return resolve(applyPlanToExistingHtml(plan, currentHtml, onChunk, retryCount + 1, projectId));
         }
-        reject(new Error("Failed to parse patch plan"));
+        reject(new Error("Failed to parse patch plan: " + (e as Error).message));
         return;
       }
 
