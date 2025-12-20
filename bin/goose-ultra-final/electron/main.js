@@ -361,28 +361,55 @@ function auditLog(entry) {
 let keytar;
 try {
     // Try to import keytar if available
-    keytar = await import('keytar');
+    const keytarModule = await import('keytar');
+    keytar = keytarModule.default || keytarModule;
+    console.log('[Vault] Keytar loaded successfully');
 } catch (e) {
-    console.warn('[Vi Control] Keytar not found, using encrypted file fallback.');
+    console.warn('[Vault] Keytar not found, using encrypted file fallback.');
 }
 
 async function getSecret(id) {
-    if (keytar && keytar.getPassword) {
-        return await keytar.getPassword('GooseUltra', id);
+    try {
+        if (keytar && typeof keytar.getPassword === 'function') {
+            const value = await keytar.getPassword('GooseUltra', id);
+            console.log(`[Vault] Retrieved secret for ${id}: ${value ? 'found' : 'not found'}`);
+            return value;
+        }
+    } catch (e) {
+        console.warn(`[Vault] Keytar getPassword failed for ${id}:`, e.message);
     }
-    // Encrypted file fallback logic (simplified for brevity, in real world use specialized encryption)
-    if (!fs.existsSync(VAULT_FILE)) return null;
-    const data = JSON.parse(fs.readFileSync(VAULT_FILE, 'utf8'));
-    return data[id] ? Buffer.from(data[id], 'base64').toString() : null;
+    // Encrypted file fallback logic
+    if (!fs.existsSync(VAULT_FILE)) {
+        console.log(`[Vault] Vault file not found, returning null for ${id}`);
+        return null;
+    }
+    try {
+        const data = JSON.parse(fs.readFileSync(VAULT_FILE, 'utf8'));
+        const value = data[id] ? Buffer.from(data[id], 'base64').toString() : null;
+        console.log(`[Vault] Retrieved secret from file for ${id}: ${value ? 'found' : 'not found'}`);
+        return value;
+    } catch (e) {
+        console.error(`[Vault] Error reading vault file:`, e.message);
+        return null;
+    }
 }
 
 async function saveSecret(id, secret) {
-    if (keytar && keytar.setPassword) {
-        return await keytar.setPassword('GooseUltra', id, secret);
+    console.log(`[Vault] Saving secret for ${id}...`);
+    try {
+        if (keytar && typeof keytar.setPassword === 'function') {
+            await keytar.setPassword('GooseUltra', id, secret);
+            console.log(`[Vault] Saved to keytar: ${id}`);
+            return;
+        }
+    } catch (e) {
+        console.warn(`[Vault] Keytar setPassword failed, falling back to file:`, e.message);
     }
+    // File fallback
     const data = fs.existsSync(VAULT_FILE) ? JSON.parse(fs.readFileSync(VAULT_FILE, 'utf8')) : {};
     data[id] = Buffer.from(secret).toString('base64');
     fs.writeFileSync(VAULT_FILE, JSON.stringify(data));
+    console.log(`[Vault] Saved to file: ${id}`);
 }
 
 // Host IPC Handlers
