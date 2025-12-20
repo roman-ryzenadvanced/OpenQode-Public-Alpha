@@ -3409,6 +3409,17 @@ const LogMessage = ({ message, type }: { message: string, type: 'user' | 'system
               <Icons.Check className="w-3.5 h-3.5" />
               <span className="text-[10px] font-bold">APPROVE & BUILD</span>
             </button>
+            <button
+              onClick={() => {
+                if (planSignature) dispatch({ type: 'RESOLVE_PLAN', signature: planSignature, resolution: 'rejected' });
+                dispatch({ type: 'START_REQUEST', sessionId: Date.now().toString(), messageDraft: "Please retry and regenerate the plan." });
+              }}
+              className="p-1.5 hover:bg-amber-500/20 bg-amber-500/10 text-amber-400 rounded-md transition-colors flex items-center gap-1.5 px-3"
+              title="Reject and Retry"
+            >
+              <Icons.RefreshCw className="w-3.5 h-3.5" />
+              <span className="text-[10px] font-bold">RETRY</span>
+            </button>
             <button onClick={handleEditToggle} className="p-1.5 hover:bg-blue-500/20 bg-blue-500/10 text-blue-400 rounded-md transition-colors">
               <Icons.MessageSquare className="w-3.5 h-3.5" />
             </button>

@@ -836,9 +836,24 @@ export const PlanView = () => {
                             cursorBlinking: 'smooth'
                         }}
                     />
-                    <div className="absolute bottom-4 right-4 bg-black/80 backdrop-blur border border-white/10 rounded-lg px-3 py-1.5 text-xs font-mono text-primary flex items-center gap-2">
-                        <Icons.Sparkles className="w-3 h-3 animate-pulse" />
-                        Receiving Packets...
+                    <div className="absolute bottom-4 right-4 flex items-center gap-2">
+                        <button
+                            onClick={() => {
+                                if (confirm('Abort current build process?')) {
+                                    dispatch({ type: 'SET_STATE', state: OrchestratorState.ProjectSelected });
+                                    dispatch({ type: 'UPDATE_STREAMING_CODE', code: null });
+                                    dispatch({ type: 'ADD_LOG', log: { id: Date.now().toString(), timestamp: Date.now(), type: 'system', message: 'User aborted the build process.' } });
+                                }
+                            }}
+                            className="bg-zinc-900/90 hover:bg-zinc-800 text-xs text-zinc-400 hover:text-rose-400 border border-white/10 rounded-lg px-3 py-1.5 transition-colors flex items-center gap-2 shadow-xl backdrop-blur-md"
+                        >
+                            <Icons.ZapOff className="w-3.5 h-3.5" />
+                            Cancel AI
+                        </button>
+                        <div className="bg-black/80 backdrop-blur border border-white/10 rounded-lg px-3 py-1.5 text-xs font-mono text-primary flex items-center gap-2">
+                            <Icons.Sparkles className="w-3 h-3 animate-pulse" />
+                            Receiving Packets...
+                        </div>
                     </div>
                 </div>
             </div>
