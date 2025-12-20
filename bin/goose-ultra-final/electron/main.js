@@ -9,6 +9,10 @@ import * as viAutomation from './vi-automation.js';
 import { execFile } from 'child_process';
 import { promisify } from 'util';
 
+// User Authentication & Qwen OAuth
+import * as userData from './user-data.js';
+import * as qwenOAuth from './qwen-oauth.js';
+
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
@@ -701,6 +705,170 @@ ipcMain.on('vi-execute-chain', async (event, { tasks }) => {
 // Open Browser
 ipcMain.handle('vi-open-browser', async (_, { url }) => {
     return await viAutomation.openBrowser(url);
+});
+
+// ============================================
+// USER AUTHENTICATION SYSTEM
+// ============================================
+
+// Get secret questions list
+ipcMain.handle('user-get-secret-questions', () => {
+    return userData.SECRET_QUESTIONS;
+});
+
+// Create a new user account
+ipcMain.handle('user-create', async (_, { displayName, questionId, answer }) => {
+    try {
+        const { user, secretCode } = userData.createUser(displayName, questionId, answer);
+        // Auto-start session for new user
+        const session = userData.startSession(user);
+        return { success: true, user, secretCode, session };
+    } catch (error) {
+        console.error('[UserAuth] Create user failed:', error);
+        return { success: false, error: error.message };
+    }
+});
+
+// Authenticate user with secret code
+ipcMain.handle('user-login', async (_, { secretCode }) => {
+    try {
+        const user = userData.authenticateUser(secretCode);
+        if (user) {
+            const session = userData.startSession(user);
+            return { success: true, user, session };
+        }
+        return { success: false, error: 'Invalid secret code' };
+    } catch (error) {
+        console.error('[UserAuth] Login failed:', error);
+        return { success: false, error: error.message };
+    }
+});
+
+// Get current session
+ipcMain.handle('user-get-session', () => {
+    return userData.getCurrentSession();
+});
+
+// Logout (end session)
+ipcMain.handle('user-logout', async (_, { cleanData }) => {
+    try {
+        const session = userData.getCurrentSession();
+
+        if (cleanData && session?.userId) {
+            userData.cleanUserData(session.userId);
+        }
+
+        userData.endSession();
+        return { success: true };
+    } catch (error) {
+        console.error('[UserAuth] Logout failed:', error);
+        return { success: false, error: error.message };
+    }
+});
+
+// Get user statistics
+ipcMain.handle('user-get-stats', async (_, { userId }) => {
+    try {
+        return userData.getUserStats(userId);
+    } catch (error) {
+        return { projectCount: 0, chatCount: 0, totalSizeBytes: 0, hasQwenTokens: false };
+    }
+});
+
+// Clean user data without logout
+ipcMain.handle('user-clean-data', async (_, { userId }) => {
+    try {
+        userData.cleanUserData(userId);
+        return { success: true };
+    } catch (error) {
+        return { success: false, error: error.message };
+    }
+});
+
+// Get user's projects directory
+ipcMain.handle('user-get-projects-dir', (_, { userId }) => {
+    return userData.getUserProjectsDir(userId);
+});
+
+// ============================================
+// QWEN OAUTH (INLINE DEVICE FLOW)
+// ============================================
+
+// Start Qwen OAuth device flow
+ipcMain.on('qwen-auth-start', async (event) => {
+    const window = BrowserWindow.fromWebContents(event.sender);
+    if (!window || window.isDestroyed()) return;
+
+    const session = userData.getCurrentSession();
+
+    await qwenOAuth.startDeviceFlow(
+        // onProgress
+        (progress) => {
+            if (!window.isDestroyed()) {
+                window.webContents.send('qwen-auth-progress', progress);
+            }
+        },
+        // onSuccess
+        (credentials) => {
+            // Save tokens to user-specific location if logged in
+            if (session?.userId) {
+                qwenOAuth.saveUserTokens(session.userId, app.getPath('userData'), credentials);
+            } else {
+                // Fallback to legacy location for backward compatibility
+                qwenOAuth.saveLegacyTokens(credentials);
+            }
+
+            if (!window.isDestroyed()) {
+                window.webContents.send('qwen-auth-success', credentials);
+            }
+        },
+        // onError
+        (error) => {
+            if (!window.isDestroyed()) {
+                window.webContents.send('qwen-auth-error', error);
+            }
+        }
+    );
+});
+
+// Cancel ongoing Qwen OAuth
+ipcMain.on('qwen-auth-cancel', () => {
+    qwenOAuth.cancelAuth();
+});
+
+// Get Qwen auth status for current user
+ipcMain.handle('qwen-get-auth-status', () => {
+    const session = userData.getCurrentSession();
+
+    let tokens = null;
+    if (session?.userId) {
+        tokens = qwenOAuth.loadUserTokens(session.userId, app.getPath('userData'));
+    }
+
+    // Fallback to legacy tokens if not logged in or no user tokens
+    if (!tokens) {
+        tokens = qwenOAuth.loadLegacyTokens();
+    }
+
+    const isValid = tokens?.access_token &&
+        (!tokens.expiry_date || tokens.expiry_date > Date.now() + 30000);
+
+    return {
+        isAuthenticated: !!tokens?.access_token,
+        isValid,
+        expiresAt: tokens?.expiry_date || null
+    };
+});
+
+// Clear Qwen tokens for current user
+ipcMain.handle('qwen-clear-tokens', () => {
+    const session = userData.getCurrentSession();
+
+    if (session?.userId) {
+        qwenOAuth.clearUserTokens(session.userId, app.getPath('userData'));
+    }
+
+    return { success: true };
 });
 
 console.log('Goose Ultra Electron Main Process Started');

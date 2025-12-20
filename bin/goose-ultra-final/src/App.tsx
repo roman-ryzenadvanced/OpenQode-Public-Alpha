@@ -5,6 +5,7 @@ import { TabNav, StartView, PlanView, PreviewView, EditorView, DiscoverView, Com
 import { ViControlView } from './components/ViControlView';
 import { TabId, OrchestratorState, GlobalMode } from './types';
 import { ErrorBoundary } from './ErrorBoundary';
+import { LoginGate } from './components/UserAuth';
 
 const MainLayout = () => {
   const { state } = useOrchestrator();
@@ -66,10 +67,13 @@ const MainLayout = () => {
 
 export default function App() {
   return (
-    <OrchestratorProvider>
-      <ErrorBoundary>
-        <MainLayout />
-      </ErrorBoundary>
-    </OrchestratorProvider>
+    <LoginGate>
+      <OrchestratorProvider>
+        <ErrorBoundary>
+          <MainLayout />
+        </ErrorBoundary>
+      </OrchestratorProvider>
+    </LoginGate>
   );
 }
+
