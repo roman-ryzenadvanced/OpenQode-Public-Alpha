@@ -184,19 +184,33 @@ Access **state-of-the-art open-weight models** for FREE via Ollama Cloud:
 
 #### 🚀 Available Free Models:
 
-| Model | Size | Best For |
-|-------|------|----------|
-| **GPT-OSS 120B** | 120B | OpenAI's open-weight reasoning model |
-| **DeepSeek V3.2** | MoE | Superior reasoning & agent performance |
-| **Gemini 3 Pro Preview** | Cloud | Google's SOTA reasoning model |
-| **Qwen3 Coder 480B** | 480B | Agentic coding, long context |
-| **Devstral 2 123B** | 123B | Multi-file editing, software agents |
-| **Kimi K2** | MoE | State-of-the-art coding agent tasks |
-| **Qwen3 VL 235B** | 235B | Vision + language understanding |
-| **Gemini 3 Flash** | Cloud | Fast, frontier intelligence |
-| **Ministral 3** | 3-14B | Edge deployment, fast responses |
+| Model | Size | Category | Best For |
+|-------|------|----------|----------|
+| **GPT-OSS 120B** | 120B | Flagship | OpenAI's open-weight reasoning model |
+| **DeepSeek V3.2** | MoE | Flagship | Superior reasoning & agent performance |
+| **DeepSeek V3.1** | 671B | Flagship | Hybrid thinking/non-thinking mode |
+| **Gemini 3 Pro Preview** | Cloud | Flagship | Google's most intelligent model with SOTA reasoning |
+| **Gemini 3 Flash Preview** | Cloud | Fast | Frontier intelligence built for speed |
+| **Qwen3 Coder 480B** | 480B | Coding | Agentic coding, long context |
+| **Qwen3 Coder 30B** | 30B | Coding | Agentic coding model |
+| **Devstral 2 123B** | 123B | Coding | Multi-file editing, software agents |
+| **Devstral Small 2 24B** | 24B | Coding | Vision + tools for software engineering agents |
+| **RNJ-1 8B** | 8B | Coding | Essential AI model optimized for code and STEM |
+| **Qwen3 Next 80B** | 80B | Reasoning | Strong parameter efficiency and inference speed |
+| **Kimi K2** | MoE | Reasoning | State-of-the-art coding agent tasks |
+| **Kimi K2 Thinking** | MoE | Reasoning | Moonshot AI's best open-source thinking model |
+| **Cogito 2.1** | 671B | Reasoning | Instruction tuned generative model |
+| **Qwen3 VL 235B** | 235B | Vision | Most powerful vision-language model in Qwen family |
+| **Qwen3 VL 32B** | 32B | Vision | Powerful vision-language understanding |
+| **Gemma 3 27B** | 27B | Vision | Most capable model that runs on a single GPU |
+| **Ministral 3 14B** | 14B | Fast | Edge deployment, fast responses |
+| **Ministral 3 8B** | 8B | Fast | Edge deployment with vision + tools |
+| **Nemotron 3 Nano** | Nano | Fast | Efficient, open, and intelligent agentic model |
+| **GLM 4.6** | Large | Flagship | Advanced agentic, reasoning and coding |
+| **MiniMax M2** | Large | Flagship | High-efficiency LLM for coding agents |
+| **Mistral Large 3** | MoE | Flagship | Multimodal MoE for production-grade tasks |
 
-...and many more! Open the **AI Model Manager** in Goose Ultra to see all available models.
+...and more! Open the **AI Model Manager** in Goose Ultra to see the full list.
 
 #### 📖 Ollama Cloud Docs:
 - API Documentation: [docs.ollama.com/cloud](https://docs.ollama.com/cloud)
