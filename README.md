@@ -107,6 +107,14 @@ Advanced automation capabilities with new robust connectivity:
 - **Competitive Intelligence** - AI researches top competitors for design inspiration
 - **Mobile-First** - All generated code is responsive by default
 
+### 📦 UX Package Generator (New!)
+
+Export your entire frontend (HTML/CSS/JS) into a single, portable `ux_package.json` file. 
+
+- **Portable Payload** - Perfect for loading into other AI coding agents (Gemini, ChatGPT, Claude) to build the backend logic.
+- **One-Click Export** - Instantly package your project's frontend artifacts and instructions.
+- **Backend-Ready** - Includes specific prompts instructing the AI how to implement the server-side logic based on your frontend.
+
 ---
 
 ## 🛠️ System Requirements
