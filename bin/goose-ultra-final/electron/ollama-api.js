@@ -62,10 +62,13 @@ export async function streamChat(messages, model = 'gpt-oss:120b', onChunk, onCo
         activeRequest = req;
         let fullResponse = '';
 
+        log(`Response status: ${res.statusCode}`);
+
         if (res.statusCode !== 200) {
             let errBody = '';
             res.on('data', (c) => errBody += c.toString());
             res.on('end', () => {
+                log(`API Error: ${errBody}`);
                 onError(new Error(`Ollama API Error ${res.statusCode}: ${errBody}`));
             });
             return;
@@ -77,7 +80,7 @@ export async function streamChat(messages, model = 'gpt-oss:120b', onChunk, onCo
         res.on('data', (chunk) => {
             buffer += chunk;
             const lines = buffer.split('\n');
-            buffer = lines.pop();
+            buffer = lines.pop(); // Keep incomplete line in buffer
 
             for (const line of lines) {
                 if (!line.trim()) continue;
@@ -88,22 +91,53 @@ export async function streamChat(messages, model = 'gpt-oss:120b', onChunk, onCo
                         fullResponse += content;
                         onChunk(content);
                     }
-                    if (parsed.done) {
-                        // Request is done according to Ollama API
+                    // Check if this is the final message
+                    if (parsed.done === true) {
+                        log('Received done signal from Ollama');
                     }
                 } catch (e) {
                     // Ignore malformed JSON chunks
+                    log(`Parse error (ignored): ${e.message}`);
                 }
             }
         });
 
         res.on('end', () => {
+            // Process any remaining data in buffer
+            if (buffer.trim()) {
+                try {
+                    const parsed = JSON.parse(buffer);
+                    const content = parsed.message?.content || '';
+                    if (content) {
+                        fullResponse += content;
+                        onChunk(content);
+                    }
+                } catch (e) {
+                    // Final chunk wasn't valid JSON, that's fine
+                }
+            }
+            log(`Stream complete. Total response length: ${fullResponse.length}`);
             onComplete(fullResponse);
+            activeRequest = null;
+        });
+
+        res.on('error', (e) => {
+            log(`Response error: ${e.message}`);
+            onError(e);
+            activeRequest = null;
         });
     });
 
     req.on('error', (e) => {
+        log(`Request error: ${e.message}`);
         onError(e);
+        activeRequest = null;
+    });
+
+    req.setTimeout(120000, () => {
+        log('Request timeout after 120s');
+        req.destroy();
+        onError(new Error('Ollama Cloud request timeout'));
     });
 
     req.setNoDelay(true);

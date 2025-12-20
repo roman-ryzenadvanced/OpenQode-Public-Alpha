@@ -740,16 +740,9 @@ export const Sidebar = () => {
           <div
             className={`flex items-center gap-2 text-xs cursor-pointer transition-colors p-2 hover:bg-white/5 rounded-lg mx-2 group ${state.chatSettings.ollamaEnabled ? '' : 'opacity-60'
               }`}
-            onClick={async () => {
-              // Check Ollama status and open settings if not configured
-              const electron = (window as any).electron;
-              if (electron?.ollama) {
-                const status = await electron.ollama.getKeyStatus();
-                if (!status.hasKey) {
-                  // Open AI Settings modal - dispatch a custom event
-                  window.dispatchEvent(new CustomEvent('open-ai-settings'));
-                }
-              }
+            onClick={() => {
+              // Always open AI Settings modal when clicked
+              window.dispatchEvent(new CustomEvent('open-ai-settings'));
             }}
             title={state.chatSettings.ollamaEnabled ? "Ollama Cloud connected" : "Click to configure Ollama Cloud"}
           >
