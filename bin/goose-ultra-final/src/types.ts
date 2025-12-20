@@ -178,6 +178,11 @@ export interface OrchestratorContext {
 
   // Settings
   preferredFramework: string | null;
+  chatSettings: {
+    activeModel: string;
+    ollamaEnabled: boolean;
+    availableModels: string[];
+  };
 
   // Apex Level PASS - Elite Developer Mode
   apexModeEnabled: boolean;

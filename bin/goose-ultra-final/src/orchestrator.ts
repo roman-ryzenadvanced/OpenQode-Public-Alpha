@@ -72,7 +72,12 @@ type Action =
   | { type: 'SET_PREFERRED_FRAMEWORK'; framework: string | null }
   | { type: 'SET_STATE'; state: OrchestratorState }
   // Apex Level PASS
-  | { type: 'TOGGLE_APEX_MODE' };
+  // Apex Level PASS
+  | { type: 'TOGGLE_APEX_MODE' }
+  // Chat Settings
+  | { type: 'SET_CHAT_MODEL'; model: string }
+  | { type: 'TOGGLE_OLLAMA'; enabled: boolean }
+  | { type: 'SET_AVAILABLE_MODELS'; models: string[] };
 
 // --- Helper: Tab Eligibility ---
 // Strictly enforces "Tab validity" rule
@@ -376,6 +381,15 @@ const reducer = (state: OrchestratorContext, action: Action): OrchestratorContex
 
     case 'TOGGLE_APEX_MODE':
       return { ...state, apexModeEnabled: !state.apexModeEnabled };
+
+    case 'SET_CHAT_MODEL':
+      return { ...state, chatSettings: { ...state.chatSettings, activeModel: action.model } };
+
+    case 'TOGGLE_OLLAMA':
+      return { ...state, chatSettings: { ...state.chatSettings, ollamaEnabled: action.enabled } };
+
+    case 'SET_AVAILABLE_MODELS':
+      return { ...state, chatSettings: { ...state.chatSettings, availableModels: action.models } };
 
     default:
       return state;

@@ -688,6 +688,114 @@ export const Sidebar = () => {
             {state.executionSettings.localPowerShellEnabled ? 'ON' : 'OFF'}
           </span>
         </div>
+
+        {/* AI Models Manager */}
+        <div className="mt-4 pt-4 border-t border-white/5">
+          <div className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-3 px-2 flex items-center gap-2">
+            <Icons.Sparkles className="w-3 h-3" />
+            AI Models
+          </div>
+
+          {/* Active Model Display */}
+          <div className="px-2 mb-2">
+            <div className="bg-white/5 border border-white/10 rounded-xl p-3">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-[9px] text-zinc-500 uppercase tracking-widest">Active Model</span>
+                <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${state.chatSettings.activeModel.startsWith('ollama:')
+                  ? 'bg-blue-500/20 text-blue-400'
+                  : 'bg-emerald-500/20 text-emerald-400'
+                  }`}>
+                  {state.chatSettings.activeModel.startsWith('ollama:') ? 'OLLAMA' : 'QWEN'}
+                </span>
+              </div>
+              <div className="text-xs text-white font-mono truncate">
+                {state.chatSettings.activeModel}
+              </div>
+            </div>
+          </div>
+
+          {/* Qwen OAuth Status */}
+          <div
+            className="flex items-center gap-2 text-xs cursor-pointer transition-colors p-2 hover:bg-white/5 rounded-lg mx-2 group"
+            onClick={() => {
+              // Trigger Qwen OAuth flow
+              const electron = (window as any).electron;
+              if (electron?.openQwenAuth) {
+                electron.openQwenAuth();
+              }
+            }}
+            title="Click to authenticate with Qwen"
+          >
+            <div className="w-6 h-6 rounded-lg bg-emerald-500/20 flex items-center justify-center border border-emerald-500/30">
+              <span className="text-emerald-400 font-bold text-xs">Q</span>
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="text-zinc-300 text-xs font-medium">Qwen Cloud</div>
+              <div className="text-[9px] text-emerald-500">Connected • Free Tier</div>
+            </div>
+            <Icons.CheckCircle className="w-3.5 h-3.5 text-emerald-500" />
+          </div>
+
+          {/* Ollama Cloud Status */}
+          <div
+            className={`flex items-center gap-2 text-xs cursor-pointer transition-colors p-2 hover:bg-white/5 rounded-lg mx-2 group ${state.chatSettings.ollamaEnabled ? '' : 'opacity-60'
+              }`}
+            onClick={async () => {
+              // Check Ollama status and open settings if not configured
+              const electron = (window as any).electron;
+              if (electron?.ollama) {
+                const status = await electron.ollama.getKeyStatus();
+                if (!status.hasKey) {
+                  // Open AI Settings modal - dispatch a custom event
+                  window.dispatchEvent(new CustomEvent('open-ai-settings'));
+                }
+              }
+            }}
+            title={state.chatSettings.ollamaEnabled ? "Ollama Cloud connected" : "Click to configure Ollama Cloud"}
+          >
+            <div className={`w-6 h-6 rounded-lg flex items-center justify-center border ${state.chatSettings.ollamaEnabled
+              ? 'bg-blue-500/20 border-blue-500/30'
+              : 'bg-zinc-800 border-white/10'
+              }`}>
+              <Icons.Cpu className={`w-3.5 h-3.5 ${state.chatSettings.ollamaEnabled ? 'text-blue-400' : 'text-zinc-500'}`} />
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="text-zinc-300 text-xs font-medium">Ollama Cloud</div>
+              <div className={`text-[9px] ${state.chatSettings.ollamaEnabled ? 'text-blue-400' : 'text-zinc-600'}`}>
+                {state.chatSettings.ollamaEnabled ? `${state.chatSettings.availableModels.filter(m => m.startsWith('ollama:')).length} models available` : 'Not configured'}
+              </div>
+            </div>
+            {state.chatSettings.ollamaEnabled ? (
+              <Icons.CheckCircle className="w-3.5 h-3.5 text-blue-400" />
+            ) : (
+              <Icons.Plus className="w-3.5 h-3.5 text-zinc-500 group-hover:text-white transition-colors" />
+            )}
+          </div>
+
+          {/* Model Selector Dropdown */}
+          {state.chatSettings.availableModels.length > 1 && (
+            <div className="px-2 mt-3">
+              <select
+                value={state.chatSettings.activeModel}
+                onChange={(e) => dispatch({ type: 'SET_CHAT_MODEL', model: e.target.value })}
+                className="w-full bg-black/50 border border-white/10 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-primary/50 cursor-pointer"
+              >
+                <optgroup label="Qwen Cloud">
+                  {state.chatSettings.availableModels.filter(m => !m.startsWith('ollama:')).map(model => (
+                    <option key={model} value={model}>{model}</option>
+                  ))}
+                </optgroup>
+                {state.chatSettings.availableModels.some(m => m.startsWith('ollama:')) && (
+                  <optgroup label="Ollama Cloud">
+                    {state.chatSettings.availableModels.filter(m => m.startsWith('ollama:')).map(model => (
+                      <option key={model} value={model}>{model.replace('ollama:', '')}</option>
+                    ))}
+                  </optgroup>
+                )}
+              </select>
+            </div>
+          )}
+        </div>
       </div>
     </div >
   );
@@ -1625,6 +1733,308 @@ const SkillsSelectorModal = ({ onClose, onSelect }: { onClose: () => void, onSel
   );
 };
 
+export // --- AI Settings Modal (Ollama Cloud & Model Control) ---
+  function AISettingsModal({ onClose }: { onClose: () => void }) {
+  const { state, dispatch } = useOrchestrator();
+  const [ollamaKey, setOllamaKey] = useState('');
+  const [isSaving, setIsSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<'qwen' | 'ollama'>('ollama');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState<string>('all');
+
+  // Official Ollama Cloud models from https://ollama.com/search?c=cloud
+  const FREE_OLLAMA_MODELS = [
+    // Top Tier - Most Popular
+    { id: 'gpt-oss:120b', name: 'GPT-OSS 120B', category: 'Flagship', description: 'OpenAI\'s open-weight model for reasoning, agentic tasks', size: '120B', free: true },
+    { id: 'deepseek-v3.2', name: 'DeepSeek V3.2', category: 'Flagship', description: 'High efficiency with superior reasoning and agent performance', size: 'MoE', free: true },
+    { id: 'deepseek-v3.1:671b', name: 'DeepSeek V3.1', category: 'Flagship', description: 'Hybrid thinking/non-thinking mode', size: '671B', free: true },
+    { id: 'gemini-3-pro-preview', name: 'Gemini 3 Pro Preview', category: 'Flagship', description: 'Google\'s most intelligent model with SOTA reasoning', size: 'Cloud', free: true },
+    { id: 'gemini-3-flash-preview', name: 'Gemini 3 Flash Preview', category: 'Fast', description: 'Frontier intelligence built for speed', size: 'Cloud', free: true },
+
+    // Coding Models
+    { id: 'qwen3-coder:480b', name: 'Qwen3 Coder 480B', category: 'Coding', description: 'Alibaba\'s performant long context for agentic and coding', size: '480B', free: true },
+    { id: 'qwen3-coder:30b', name: 'Qwen3 Coder 30B', category: 'Coding', description: 'Alibaba\'s agentic and coding model', size: '30B', free: true },
+    { id: 'devstral-2:123b', name: 'Devstral 2 123B', category: 'Coding', description: 'Excels at codebase exploration and multi-file editing', size: '123B', free: true },
+    { id: 'devstral-small-2:24b', name: 'Devstral Small 2 24B', category: 'Coding', description: 'Vision + tools for software engineering agents', size: '24B', free: true },
+    { id: 'rnj-1:8b', name: 'RNJ-1 8B', category: 'Coding', description: 'Essential AI model optimized for code and STEM', size: '8B', free: true },
+
+    // Reasoning Models
+    { id: 'qwen3-next:80b', name: 'Qwen3 Next 80B', category: 'Reasoning', description: 'Strong parameter efficiency and inference speed', size: '80B', free: true },
+    { id: 'kimi-k2', name: 'Kimi K2', category: 'Reasoning', description: 'State-of-the-art MoE model for coding agent tasks', size: 'MoE', free: true },
+    { id: 'kimi-k2-thinking', name: 'Kimi K2 Thinking', category: 'Reasoning', description: 'Moonshot AI\'s best open-source thinking model', size: 'MoE', free: true },
+    { id: 'cogito-2.1:671b', name: 'Cogito 2.1', category: 'Reasoning', description: 'Instruction tuned generative model (MIT license)', size: '671B', free: true },
+
+    // Vision Models  
+    { id: 'qwen3-vl:235b', name: 'Qwen3 VL 235B', category: 'Vision', description: 'Most powerful vision-language model in Qwen family', size: '235B', free: true },
+    { id: 'qwen3-vl:32b', name: 'Qwen3 VL 32B', category: 'Vision', description: 'Powerful vision-language understanding', size: '32B', free: true },
+    { id: 'gemma3:27b', name: 'Gemma 3 27B', category: 'Vision', description: 'Most capable model that runs on a single GPU', size: '27B', free: true },
+
+    // Fast / Edge Models
+    { id: 'ministral-3:14b', name: 'Ministral 3 14B', category: 'Fast', description: 'Designed for edge deployment', size: '14B', free: true },
+    { id: 'ministral-3:8b', name: 'Ministral 3 8B', category: 'Fast', description: 'Edge deployment with vision + tools', size: '8B', free: true },
+    { id: 'nemotron-3-nano', name: 'Nemotron 3 Nano', category: 'Fast', description: 'Efficient, open, and intelligent agentic model', size: 'Nano', free: true },
+
+    // Enterprise / Large Scale
+    { id: 'glm-4.6', name: 'GLM 4.6', category: 'Flagship', description: 'Advanced agentic, reasoning and coding capabilities', size: 'Large', free: true },
+    { id: 'minimax-m2', name: 'MiniMax M2', category: 'Flagship', description: 'High-efficiency LLM for coding and agentic workflows', size: 'Large', free: true },
+    { id: 'mistral-large-3', name: 'Mistral Large 3', category: 'Flagship', description: 'Multimodal MoE for production-grade tasks', size: 'MoE', free: true },
+  ];
+
+  const categories = ['all', ...Array.from(new Set(FREE_OLLAMA_MODELS.map(m => m.category)))];
+
+  const filteredModels = FREE_OLLAMA_MODELS.filter(m => {
+    const matchesSearch = m.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      m.description.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesCategory = selectedCategory === 'all' || m.category === selectedCategory;
+    return matchesSearch && matchesCategory;
+  });
+
+  const handleSelectOllamaModel = (modelId: string) => {
+    const fullModelId = `ollama:${modelId}`;
+
+    // Add to available models if not already there
+    if (!state.chatSettings.availableModels.includes(fullModelId)) {
+      dispatch({
+        type: 'SET_AVAILABLE_MODELS',
+        models: [...state.chatSettings.availableModels, fullModelId]
+      });
+    }
+
+    // Set as active model
+    dispatch({ type: 'SET_CHAT_MODEL', model: fullModelId });
+    dispatch({ type: 'TOGGLE_OLLAMA', enabled: true });
+  };
+
+  const handleSaveKey = async () => {
+    if (!ollamaKey.trim()) return;
+    setIsSaving(true);
+    setError(null);
+    try {
+      await (window as any).electron.ollama.saveKey(ollamaKey);
+      setOllamaKey('');
+      setError(null);
+    } catch (e: any) {
+      setError(e.message || "Failed to save key");
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-[100] flex items-center justify-center p-6 animate-fade-in">
+      <div className="bg-[#0f0f11] border border-white/10 rounded-3xl w-full max-w-2xl shadow-[0_0_100px_rgba(0,0,0,0.5)] overflow-hidden flex flex-col max-h-[85vh]">
+        {/* Header */}
+        <div className="p-6 border-b border-white/5 flex items-center justify-between bg-white/5 shrink-0">
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-primary/10 rounded-xl">
+              <Icons.Sparkles className="w-5 h-5 text-primary" />
+            </div>
+            <div>
+              <h3 className="text-white font-bold text-lg">AI Model Manager</h3>
+              <p className="text-zinc-500 text-xs">Select your preferred AI model</p>
+            </div>
+          </div>
+          <button onClick={onClose} className="p-2 hover:bg-white/10 rounded-lg text-zinc-400 hover:text-white transition-colors">
+            <Icons.X className="w-5 h-5" />
+          </button>
+        </div>
+
+        {/* Tab Navigation */}
+        <div className="flex border-b border-white/5 shrink-0">
+          <button
+            onClick={() => setActiveTab('qwen')}
+            className={`flex-1 py-3 text-sm font-bold transition-all flex items-center justify-center gap-2 ${activeTab === 'qwen'
+              ? 'text-emerald-400 border-b-2 border-emerald-400 bg-emerald-500/5'
+              : 'text-zinc-500 hover:text-zinc-300'
+              }`}
+          >
+            <span className="w-5 h-5 rounded bg-emerald-500/20 flex items-center justify-center text-xs font-bold text-emerald-400">Q</span>
+            Qwen Cloud
+          </button>
+          <button
+            onClick={() => setActiveTab('ollama')}
+            className={`flex-1 py-3 text-sm font-bold transition-all flex items-center justify-center gap-2 ${activeTab === 'ollama'
+              ? 'text-blue-400 border-b-2 border-blue-400 bg-blue-500/5'
+              : 'text-zinc-500 hover:text-zinc-300'
+              }`}
+          >
+            <Icons.Cpu className="w-4 h-4" />
+            Ollama Cloud
+            <span className="text-[9px] bg-blue-500/20 text-blue-400 px-1.5 py-0.5 rounded font-bold">FREE</span>
+          </button>
+        </div>
+
+        {/* Content */}
+        <div className="flex-1 overflow-y-auto">
+          {activeTab === 'qwen' && (
+            <div className="p-6 space-y-4">
+              <div className="text-center py-8">
+                <div className="w-16 h-16 bg-emerald-500/20 rounded-2xl flex items-center justify-center mx-auto mb-4 border border-emerald-500/30">
+                  <span className="text-emerald-400 font-bold text-2xl">Q</span>
+                </div>
+                <h4 className="text-white font-bold text-lg mb-2">Qwen Cloud</h4>
+                <p className="text-zinc-500 text-sm mb-6">Alibaba's powerful AI models with free tier access</p>
+
+                <div className="space-y-2 max-w-xs mx-auto">
+                  {['qwen-coder-plus', 'qwen-plus', 'qwen-turbo'].map(model => (
+                    <button
+                      key={model}
+                      onClick={() => dispatch({ type: 'SET_CHAT_MODEL', model })}
+                      className={`w-full flex items-center justify-between p-4 rounded-xl border transition-all ${state.chatSettings.activeModel === model
+                        ? 'bg-emerald-500/10 border-emerald-500/40 text-white'
+                        : 'bg-white/5 border-white/10 text-zinc-400 hover:border-white/20'
+                        }`}
+                    >
+                      <span className="font-mono text-sm">{model}</span>
+                      {state.chatSettings.activeModel === model && (
+                        <Icons.Check className="w-4 h-4 text-emerald-400" />
+                      )}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {activeTab === 'ollama' && (
+            <div className="p-4 space-y-4">
+              {/* API Key Section (Collapsible) */}
+              <details className="bg-white/5 border border-white/10 rounded-xl">
+                <summary className="p-4 cursor-pointer text-sm font-bold text-zinc-300 flex items-center justify-between">
+                  <span className="flex items-center gap-2">
+                    <Icons.Key className="w-4 h-4 text-zinc-500" />
+                    API Key (Optional)
+                  </span>
+                  <Icons.ChevronDown className="w-4 h-4 text-zinc-500" />
+                </summary>
+                <div className="p-4 pt-0 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <p className="text-[10px] text-zinc-500">For private models or higher rate limits. Many models work without a key.</p>
+                    <a
+                      href="https://ollama.com/settings/keys"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-[10px] bg-blue-500/20 text-blue-400 px-2 py-1 rounded-lg font-bold hover:bg-blue-500/30 transition-colors flex items-center gap-1 shrink-0"
+                    >
+                      <Icons.ExternalLink className="w-3 h-3" />
+                      Get Key
+                    </a>
+                  </div>
+                  <div className="flex gap-2">
+                    <input
+                      type="password"
+                      value={ollamaKey}
+                      onChange={(e) => setOllamaKey(e.target.value)}
+                      placeholder="sk-..."
+                      className="flex-1 bg-black border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-primary/50"
+                    />
+                    <button
+                      onClick={handleSaveKey}
+                      disabled={isSaving || !ollamaKey.trim()}
+                      className="px-4 bg-white text-black font-bold rounded-lg hover:bg-zinc-200 transition-colors disabled:opacity-50 text-sm"
+                    >
+                      {isSaving ? '...' : 'Save'}
+                    </button>
+                  </div>
+                </div>
+              </details>
+
+              {/* Search and Filter */}
+              <div className="flex gap-2">
+                <div className="flex-1 relative">
+                  <Icons.Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500" />
+                  <input
+                    type="text"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    placeholder="Search models..."
+                    className="w-full bg-black/50 border border-white/10 rounded-xl pl-10 pr-4 py-2.5 text-sm text-white focus:outline-none focus:border-primary/50"
+                  />
+                </div>
+                <select
+                  value={selectedCategory}
+                  onChange={(e) => setSelectedCategory(e.target.value)}
+                  className="bg-black/50 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-primary/50"
+                >
+                  {categories.map(cat => (
+                    <option key={cat} value={cat}>{cat === 'all' ? 'All Categories' : cat}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Model Grid */}
+              <div className="grid grid-cols-1 gap-2">
+                {filteredModels.map(model => {
+                  const isActive = state.chatSettings.activeModel === `ollama:${model.id}`;
+                  return (
+                    <button
+                      key={model.id}
+                      onClick={() => handleSelectOllamaModel(model.id)}
+                      className={`flex items-center gap-4 p-4 rounded-xl border transition-all text-left group ${isActive
+                        ? 'bg-blue-500/10 border-blue-500/40 shadow-[0_0_20px_rgba(59,130,246,0.1)]'
+                        : 'bg-white/5 border-white/5 hover:border-white/20 hover:bg-white/10'
+                        }`}
+                    >
+                      <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${isActive ? 'bg-blue-500 text-white' : 'bg-zinc-800 text-zinc-400 group-hover:bg-zinc-700'
+                        }`}>
+                        {model.category === 'Coding' ? <Icons.Code className="w-5 h-5" /> :
+                          model.category === 'Vision' ? <Icons.Eye className="w-5 h-5" /> :
+                            model.category === 'Fast' ? <Icons.Zap className="w-5 h-5" /> :
+                              model.category === 'Reasoning' ? <Icons.Brain className="w-5 h-5" /> :
+                                <Icons.Sparkles className="w-5 h-5" />}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-0.5">
+                          <span className={`font-bold text-sm ${isActive ? 'text-white' : 'text-zinc-300'}`}>{model.name}</span>
+                          <span className="text-[9px] bg-zinc-800 text-zinc-500 px-1.5 py-0.5 rounded font-mono">{model.size}</span>
+                        </div>
+                        <p className="text-[11px] text-zinc-500 truncate">{model.description}</p>
+                      </div>
+                      <div className="flex items-center gap-2 shrink-0">
+                        <span className={`text-[9px] px-2 py-1 rounded-full font-bold ${model.category === 'Coding' ? 'bg-purple-500/20 text-purple-400' :
+                          model.category === 'Vision' ? 'bg-amber-500/20 text-amber-400' :
+                            model.category === 'Fast' ? 'bg-cyan-500/20 text-cyan-400' :
+                              model.category === 'Reasoning' ? 'bg-pink-500/20 text-pink-400' :
+                                'bg-blue-500/20 text-blue-400'
+                          }`}>{model.category}</span>
+                        {isActive && <Icons.Check className="w-5 h-5 text-blue-400" />}
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+
+              {filteredModels.length === 0 && (
+                <div className="text-center py-8 text-zinc-500">
+                  <Icons.Search className="w-8 h-8 mx-auto mb-2 opacity-50" />
+                  <p>No models found matching "{searchQuery}"</p>
+                </div>
+              )}
+
+              {error && <div className="text-xs text-rose-500 font-medium bg-rose-500/10 p-3 rounded-lg border border-rose-500/20">{error}</div>}
+            </div>
+          )}
+        </div>
+
+        {/* Footer */}
+        <div className="p-4 bg-white/5 border-t border-white/5 flex items-center justify-between shrink-0">
+          <div className="text-xs text-zinc-500 flex items-center gap-2">
+            <div className={`w-2 h-2 rounded-full ${state.chatSettings.activeModel.startsWith('ollama:') ? 'bg-blue-500' : 'bg-emerald-500'} animate-pulse`} />
+            Active: <span className="text-white font-mono">{state.chatSettings.activeModel}</span>
+          </div>
+          <button
+            onClick={onClose}
+            className="px-6 py-2.5 bg-white text-black font-bold rounded-xl hover:bg-zinc-200 transition-all"
+          >
+            Done
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export const ChatPanel = () => {
   const { state, dispatch } = useOrchestrator();
   const [input, setInput] = useState('');
@@ -1635,6 +2045,8 @@ export const ChatPanel = () => {
   const timelineScrollRef = React.useRef<HTMLDivElement | null>(null);
   const streamingScrollRef = React.useRef<HTMLDivElement | null>(null);
   const [autoScrollEnabled, setAutoScrollEnabled] = useState(true);
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+  const [showAISettings, setShowAISettings] = useState(false);
   const [showCustomPersona, setShowCustomPersona] = useState(false);
   const [showSkillsSelector, setShowSkillsSelector] = useState(false);
   const [customPersonaNameDraft, setCustomPersonaNameDraft] = useState(state.customChatPersonaName);
@@ -1648,6 +2060,13 @@ export const ChatPanel = () => {
   // Skill Recommendations
   const [recommendedSkills, setRecommendedSkills] = useState<Array<{ id: string; name: string; icon: string }>>([]);
   const skillDebounceRef = React.useRef<NodeJS.Timeout | null>(null);
+
+  // Listen for AI Settings open event from sidebar
+  useEffect(() => {
+    const handleOpenAISettings = () => setShowAISettings(true);
+    window.addEventListener('open-ai-settings', handleOpenAISettings);
+    return () => window.removeEventListener('open-ai-settings', handleOpenAISettings);
+  }, []);
 
   useEffect(() => {
     if (skillDebounceRef.current) clearTimeout(skillDebounceRef.current);
@@ -2282,7 +2701,7 @@ Brief plan starting with '[PLAN]'.`;
       (window as any).electron.startChat([
         { role: 'system', content: systemPrompt },
         { role: 'user', content: userPrompt }
-      ], 'qwen-coder-plus');
+      ], state.chatSettings.activeModel);
 
     } else {
       clearTimeout(timeoutId);
@@ -2457,11 +2876,21 @@ Brief plan starting with '[PLAN]'.`;
               </span>
             )}
             <span className="text-[9px] px-1.5 py-0.5 bg-zinc-800 rounded text-zinc-500 uppercase tracking-wider border border-white/5">{state.state}</span>
+            <button
+              onClick={() => setShowAISettings(true)}
+              className="p-1.5 hover:bg-white/10 rounded-lg text-zinc-400 hover:text-white transition-colors"
+              title="AI Settings"
+            >
+              <Icons.Settings className="w-3.5 h-3.5" />
+            </button>
             {state.chatDocked === 'bottom' && (
               <button onClick={() => dispatch({ type: 'TOGGLE_CHAT_DOCK' })} className="hover:text-white text-zinc-500"><Icons.Layout className="w-3 h-3" /></button>
             )}
           </div>
         </div>
+
+        {/* AI SETTINGS MODAL */}
+        {showAISettings && <AISettingsModal onClose={() => setShowAISettings(false)} />}
 
         <div
           ref={timelineScrollRef}

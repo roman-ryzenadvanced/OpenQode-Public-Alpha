@@ -91,5 +91,11 @@ contextBridge.exposeInMainWorld('electron', {
 
         // Browser
         openBrowser: (url) => ipcRenderer.invoke('vi-open-browser', { url })
+    },
+    // Ollama Cloud
+    ollama: {
+        getKeyStatus: () => ipcRenderer.invoke('ollama-get-key-status'),
+        saveKey: (key) => ipcRenderer.invoke('ollama-save-key', { key }),
+        getModels: () => ipcRenderer.invoke('ollama-get-models')
     }
 });

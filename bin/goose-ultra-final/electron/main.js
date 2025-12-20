@@ -1,7 +1,8 @@
 import { app, BrowserWindow, ipcMain, shell, protocol, net } from 'electron';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { streamChat } from './qwen-api.js';
+import { streamChat as qwenStreamChat } from './qwen-api.js';
+import * as ollamaApi from './ollama-api.js';
 import { generateImage, detectImageRequest, cleanupCache } from './image-api.js';
 import { fsApi } from './fs-api.js';
 import * as viAutomation from './vi-automation.js';
@@ -172,22 +173,53 @@ ipcMain.handle('export-project-zip', async (_, { projectId }) => {
 });
 
 // Chat Streaming IPC
-ipcMain.on('chat-stream-start', (event, { messages, model }) => {
+ipcMain.on('chat-stream-start', async (event, { messages, model }) => {
     const window = BrowserWindow.fromWebContents(event.sender);
 
-    streamChat(
-        messages,
-        model,
-        (chunk) => {
-            if (!window.isDestroyed()) {
-                // console.log('[Main] Sending chunk size:', chunk.length); // Verbose log
-                window.webContents.send('chat-chunk', chunk);
-            }
-        },
-        (fullResponse) => !window.isDestroyed() && window.webContents.send('chat-complete', fullResponse),
-        (error) => !window.isDestroyed() && window.webContents.send('chat-error', error.message),
-        (status) => !window.isDestroyed() && window.webContents.send('chat-status', status)
-    );
+    // Choose provider based on model prefix or name
+    // Default to qwen unless model starts with 'ollama:' or matches known ollama models
+    const isOllama = model?.startsWith('ollama:') || model === 'gpt-oss:120b';
+    const cleanModel = isOllama ? model.replace('ollama:', '') : model;
+
+    const onChunk = (chunk) => {
+        if (!window.isDestroyed()) window.webContents.send('chat-chunk', chunk);
+    };
+    const onComplete = (full) => {
+        if (!window.isDestroyed()) window.webContents.send('chat-complete', full);
+    };
+    const onError = (err) => {
+        if (!window.isDestroyed()) window.webContents.send('chat-error', typeof err === 'string' ? err : err.message);
+    };
+    const onStatus = (status) => {
+        if (!window.isDestroyed()) window.webContents.send('chat-status', status);
+    };
+
+    if (isOllama) {
+        // Ensure key is loaded
+        const key = await getSecret('ollama-cloud-key');
+        ollamaApi.setApiKey(key);
+        ollamaApi.streamChat(messages, cleanModel, onChunk, onComplete, onError, onStatus);
+    } else {
+        qwenStreamChat(messages, model, onChunk, onComplete, onError, onStatus);
+    }
+});
+
+// Ollama Specific Handlers
+ipcMain.handle('ollama-get-key-status', async () => {
+    const key = await getSecret('ollama-cloud-key');
+    return { hasKey: !!key };
+});
+
+ipcMain.handle('ollama-save-key', async (_, { key }) => {
+    await saveSecret('ollama-cloud-key', key);
+    ollamaApi.setApiKey(key);
+    return true;
+});
+
+ipcMain.handle('ollama-get-models', async () => {
+    const key = await getSecret('ollama-cloud-key');
+    ollamaApi.setApiKey(key);
+    return await ollamaApi.listModels();
 });
 
 // FS Handlers

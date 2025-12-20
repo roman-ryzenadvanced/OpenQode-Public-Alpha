@@ -145,16 +145,54 @@ OpenQode/
 
 ---
 
-## 🔐 Authentication
+## 🔐 AI Models & Authentication
 
-OpenQode uses **Qwen AI** for its language model capabilities. Authentication is handled automatically:
+OpenQode supports **multiple AI providers** for maximum flexibility:
+
+### 🟢 Qwen Cloud (Default - Free)
+
+Alibaba's powerful AI models with free tier access:
 
 1. **First Launch** - The app will prompt you to authenticate
 2. **Browser Login** - A browser window opens for Qwen login
 3. **Token Storage** - Credentials are stored locally and encrypted
 4. **Auto-Refresh** - Tokens are refreshed automatically
 
+Available Qwen models: `qwen-coder-plus`, `qwen-plus`, `qwen-turbo`
+
 If you need to re-authenticate, use **Option 5** in the launcher menu.
+
+---
+
+### 🔵 Ollama Cloud (Free - 20+ Models)
+
+Access **state-of-the-art open-weight models** for FREE via Ollama Cloud:
+
+#### 🎁 Get Your Free API Key:
+1. Go to **[ollama.com/settings/keys](https://ollama.com/settings/keys)**
+2. Sign in or create a free account
+3. Generate an API key
+4. Paste it in Goose Ultra's **AI Model Manager** (sidebar → AI Models)
+
+#### 🚀 Available Free Models:
+
+| Model | Size | Best For |
+|-------|------|----------|
+| **GPT-OSS 120B** | 120B | OpenAI's open-weight reasoning model |
+| **DeepSeek V3.2** | MoE | Superior reasoning & agent performance |
+| **Gemini 3 Pro Preview** | Cloud | Google's SOTA reasoning model |
+| **Qwen3 Coder 480B** | 480B | Agentic coding, long context |
+| **Devstral 2 123B** | 123B | Multi-file editing, software agents |
+| **Kimi K2** | MoE | State-of-the-art coding agent tasks |
+| **Qwen3 VL 235B** | 235B | Vision + language understanding |
+| **Gemini 3 Flash** | Cloud | Fast, frontier intelligence |
+| **Ministral 3** | 3-14B | Edge deployment, fast responses |
+
+...and many more! Open the **AI Model Manager** in Goose Ultra to see all available models.
+
+#### 📖 Ollama Cloud Docs:
+- API Documentation: [docs.ollama.com/cloud](https://docs.ollama.com/cloud)
+- Model Library: [ollama.com/search?c=cloud](https://ollama.com/search?c=cloud)
 
 ---
 

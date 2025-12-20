@@ -213,8 +213,8 @@ export const StartView = () => {
 
             (window as any).electron.startChat([
                 { role: 'system', content: systemPrompt },
-                { role: 'user', content: prompt }
-            ], 'qwen-coder-plus');
+                { role: 'user', content: combinedPrompt }
+            ], state.chatSettings.activeModel);
 
             let streamBuffer = '';
             (window as any).electron.onChatChunk((chunk: string) => {
@@ -955,7 +955,7 @@ export const PlanView = () => {
                     )}
 
                     {/* LAYER 3: Emergency / Abort buttons */}
-                    {(state.state === OrchestratorState.Planning || state.state === OrchestratorState.Building) && (
+                    {(state.state === OrchestratorState.Planning) && (
                         <button
                             onClick={() => {
                                 if (confirm('Are you sure you want to cancel the CURRENT AI action?')) {
