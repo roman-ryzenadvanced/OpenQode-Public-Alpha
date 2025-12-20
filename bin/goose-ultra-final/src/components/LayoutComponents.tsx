@@ -2422,7 +2422,8 @@ Format: { "ideas": [{ "title": "Short Title", "subtitle": "One line", "tag": "To
     }, 45000);
 
     let systemPrompt = '';
-    const isModificationMode = state.state === OrchestratorState.PreviewReady || state.state === OrchestratorState.Editing;
+    const isBackendRequest = userPrompt.includes('[BACKEND_REQUEST]');
+    const isModificationMode = (state.state === OrchestratorState.PreviewReady || state.state === OrchestratorState.Editing) && !isBackendRequest;
     let requestKind: 'chat' | 'plan' | 'code' = (isChatMode || isBrainstormMode) ? 'chat' : 'plan';
 
     // SMART ROUTING: REMOVED CONCIERGE (F4: Plan First Enforcement)
@@ -2430,6 +2431,9 @@ Format: { "ideas": [{ "title": "Short Title", "subtitle": "One line", "tag": "To
     if (isChatMode) {
       const sysP = personaSystem(state, state.chatPersona, state.customChatPersonaPrompt);
       systemPrompt = `[SYSTEM INSTRUCTION]: ${sysP}\n\n[CONTEXT]: This is CHAT mode (not building). Do not generate code unless explicitly asked. If user asks for a change to an existing project, propose a plan starting with '[PLAN]' and wait for approval. Use PLAIN PROSE for conversation, no markdown code blocks for speech.\n\n[IMAGE GENERATION]: You CAN generate images! If the user asks for an image, painting, illustration, or visual content, acknowledge that you're generating it. The system will handle the actual generation. Say something like "I'm creating that image for you now, please wait a moment...".`;
+    } else if (isBackendRequest) {
+      // Backend requests are effectively "new plans" but we handle the prompt generation specifically below
+      requestKind = 'plan';
     } else if (isBrainstormMode) {
       const lower = userPrompt.toLowerCase();
       const wantsPlan = lower.includes('plan') || lower.includes('formalize') || lower.includes('blueprint');
