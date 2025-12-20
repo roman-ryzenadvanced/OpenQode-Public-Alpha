@@ -1452,8 +1452,8 @@ Start with "# 🔧 Repair Plan" and be concise.`;
                                 return;
                             }
 
-                            // Switch to Chat to show progress
-                            dispatch({ type: 'SET_MODE', mode: GlobalMode.Chat });
+                            // Switch to Build mode (Plan tab) to show progress
+                            dispatch({ type: 'SET_MODE', mode: GlobalMode.Build });
                             dispatch({ type: 'SET_TAB', tab: TabId.Plan });
 
                             const prompt = `[BACKEND_REQUEST]

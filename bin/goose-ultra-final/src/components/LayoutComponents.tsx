@@ -2470,7 +2470,19 @@ Format: { "ideas": [{ "title": "Short Title", "subtitle": "One line", "tag": "To
         (window as any)._redesignApprovedSessions[state.activeProject.id] = true;
       }
 
-      if (isQaFailureArtifact) {
+      const isBackendRequest = userPrompt.includes('[BACKEND_REQUEST]');
+
+      if (isBackendRequest) {
+        // --- BACKEND GENERATION MODE ---
+        systemPrompt = `[SYSTEM INSTRUCTION]: BACKEND GENERATION REQUEST.
+        
+The user wants to generate a server-side implementation for the existing frontend.
+1. Analyze the provided frontend code in the user prompt.
+2. Identify all API endpoints and data structures.
+3. Propose a plan to create a 'server.js' (Node.js/Express) file.
+4. The plan MUST start with '[PLAN]'.
+5. Do NOT modify the frontend code. Only build the backend.`;
+      } else if (isQaFailureArtifact) {
         // --- REPAIR MODE (F3: Retention & Match) ---
         // "Broken frontend is treated as a REPAIR task"
         const originalIntent = state.activeProject?.originalPrompt || "Unknown Intent";
