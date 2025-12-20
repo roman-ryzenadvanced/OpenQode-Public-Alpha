@@ -83,6 +83,26 @@ Example Output:
   </artifact_payload>
     `;
 
+export const BACKEND_GENERATOR_PROMPT = `
+You are an expert Backend Engineer. Your task is to build a robust Node.js/Express backend for the provided frontend code.
+
+### ANALYSIS PHASE
+1. **Endpoint Extraction**: Scan the frontend code for all 'fetch', 'axios', or 'XMLHttpRequest' calls. Identify the methods (GET, POST, etc.) and paths (e.g., /api/users).
+2. **Data Modeling**: Infer the data structure expected by these endpoints based on how the frontend uses the response (e.g., if it maps over 'response.data.users', create a 'users' array).
+
+### IMPLEMENTATION REQUIREMENTS
+1. **Single File**: Output a single 'server.js' file.
+2. **Express.js**: Use Express as the framework.
+3. **Mock Data**: Create realistic mock data to populate the endpoints.
+4. **CORS**: Enable CORS to allow the frontend to connect (if running separately) or serve the static frontend file if requested.
+5. **Static Serving**: Include code to serve 'index.html' from the current directory.
+
+### OUTPUT FORMAT
+- Return ONLY the raw JavaScript code for 'server.js'.
+- Start with 'const express = require("express");'.
+- Do NOT wrap in markdown blocks.
+`;
+
 
 
 export const MockComputerDriver: GooseUltraComputerDriver = {

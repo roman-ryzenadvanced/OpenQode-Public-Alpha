@@ -1435,12 +1435,51 @@ Start with "# 🔧 Repair Plan" and be concise.`;
                     )}
                 </button>
 
+
                 <button
                     onClick={() => dispatch({ type: 'SET_PREVIEW_MAX_MODE', enabled: !state.previewMaxMode })}
                     className={`ml-2 px-3 py-2 rounded-xl text-xs font-bold border transition-colors ${state.previewMaxMode ? 'bg-primary text-black border-primary/40 hover:bg-emerald-400' : 'bg-white/5 text-zinc-200 border-white/10 hover:bg-white/10'}`}
                     title="Toggle Max Mode"
                 >
                     {state.previewMaxMode ? 'Exit Max' : 'Max Mode'}
+                </button>
+                <button
+                    onClick={async () => {
+                        if (confirm('Generate a Node.js/Express backend for this frontend?')) {
+                            const htmlContent = state.files['index.html'] || '';
+                            if (!htmlContent) {
+                                alert('No frontend code found to analyze.');
+                                return;
+                            }
+
+                            // Switch to Chat to show progress
+                            dispatch({ type: 'SET_MODE', mode: GlobalMode.Chat });
+                            dispatch({ type: 'SET_TAB', tab: TabId.Plan });
+
+                            const prompt = `[BACKEND_REQUEST]
+I need a backend for my frontend.
+Here is the current HTML/JS code:
+\`\`\`html
+${htmlContent.substring(0, 15000)}... (truncated)
+\`\`\`
+
+Please build a 'server.js' file using Express that:
+1. Serves this static file.
+2. Implements any API endpoints found in the fetch() calls.
+3. Provides mock data for those endpoints.`;
+
+                            dispatch({ type: 'START_REQUEST', sessionId: Date.now().toString(), messageDraft: prompt });
+
+                            // We rely on the LayoutComponents handler to pick this up, 
+                            // but we need to ensure the system prompt knows how to handle it.
+                            // Ideally, we'd invoke the automationService directly, but flowing through chat maintains state consistency.
+                        }
+                    }}
+                    className="ml-2 px-3 py-2 rounded-xl text-xs font-bold border border-white/10 bg-indigo-500/10 text-indigo-300 hover:bg-indigo-500/20 hover:text-white transition-colors flex items-center gap-2"
+                    title="Generate Backend Service"
+                >
+                    <Icons.Server className="w-3.5 h-3.5" />
+                    Build Backend
                 </button>
             </div>
 
